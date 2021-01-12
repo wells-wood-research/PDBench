@@ -1,0 +1,237 @@
+FORMAT    CDDF1.0
+DOMAIN    5n87A02
+VERSION   4.3.0
+VERDATE   11-Sep-2019
+NAME      Dual specificity protein kinase ttk. Chain: a. Synonym: phosphotyrosin
+NAME      e picked threonine-protein kinase,pyt. Engineered: yes
+SOURCE    Homo sapiens. Human. Organism_taxid: 9606. Gene: ttk, mps1, mps1l1.  E
+SOURCE    xpressed in: escherichia coli. Expression_system_taxid: 562
+CATHCODE  1.10.510.10
+CLASS     Mainly Alpha
+ARCH      Orthogonal Bundle
+TOPOL     Transferase(Phosphotransferase); domain 1
+HOMOL     Transferase(Phosphotransferase) domain 1
+DLENGTH   164
+DSEQH     >pdb|5n87A02
+DSEQS     IDLNSWLKKKKSIDPWERKSYWKNMLEAVHTIHQHGIVHSDLKPANFLIVDGMLKLIDFGIANQQVGVNY
+DSEQS     MPPEAIKDMKISPKSDVWSLGCILYYMTYGKTPFQQIINQISKLHAIIDPNHEIEFPDIPEKDLQDVLKC
+DSEQS     CLKRDPKQRISIPELLAHPYVQIQ
+NSEGMENTS 1
+SEGMENT   5n87A02:1:1
+SRANGE    START=607  STOP=794
+SLENGTH   164
+SSEQH     >pdb|5n87A02:1:1
+SSEQS     IDLNSWLKKKKSIDPWERKSYWKNMLEAVHTIHQHGIVHSDLKPANFLIVDGMLKLIDFGIANQQVGVNY
+SSEQS     MPPEAIKDMKISPKSDVWSLGCILYYMTYGKTPFQQIINQISKLHAIIDPNHEIEFPDIPEKDLQDVLKC
+SSEQS     CLKRDPKQRISIPELLAHPYVQIQ
+ENDSEG
+//
+FORMAT    CDDF1.0
+DOMAIN    4o6lA02
+VERSION   4.3.0
+VERDATE   11-Sep-2019
+NAME      Dual specificity protein kinase ttk. Chain: a, b. Fragment: kinase dom
+NAME      ain. Synonym: phosphotyrosine picked threonine-protein kinase, pyt. En
+NAME      gineered: yes
+SOURCE    Homo sapiens. Human. Organism_taxid: 9606. Gene: ttk, mps1, mps1l1.  E
+SOURCE    xpressed in: escherichia coli. Expression_system_taxid: 562
+CATHCODE  1.10.510.10
+CLASS     Mainly Alpha
+ARCH      Orthogonal Bundle
+TOPOL     Transferase(Phosphotransferase); domain 1
+HOMOL     Transferase(Phosphotransferase) domain 1
+DLENGTH   165
+DSEQH     >pdb|4o6lA02
+DSEQS     IDLNSWLKKKKSIDPWERKSYWKNMLEAVHTIHQHGIVHSDLKPANFLIVDGMLKLIDFGIANQMQPDTV
+DSEQS     NYMPPEAIKDMSISPKSDVWSLGCILYYMTYGKTPFQQIINQISKLHAIIDPNHEIEFPDIPEKDLQDVL
+DSEQS     KCCLKRDPKQRISIPELLAHPYVQI
+NSEGMENTS 1
+SEGMENT   4o6lA02:1:1
+SRANGE    START=607  STOP=793
+SLENGTH   165
+SSEQH     >pdb|4o6lA02:1:1
+SSEQS     IDLNSWLKKKKSIDPWERKSYWKNMLEAVHTIHQHGIVHSDLKPANFLIVDGMLKLIDFGIANQMQPDTV
+SSEQS     NYMPPEAIKDMSISPKSDVWSLGCILYYMTYGKTPFQQIINQISKLHAIIDPNHEIEFPDIPEKDLQDVL
+SSEQS     KCCLKRDPKQRISIPELLAHPYVQI
+ENDSEG
+//
+FORMAT    CDDF1.0
+DOMAIN    4o6lB02
+VERSION   4.3.0
+VERDATE   11-Sep-2019
+NAME      Dual specificity protein kinase ttk. Chain: a, b. Fragment: kinase dom
+NAME      ain. Synonym: phosphotyrosine picked threonine-protein kinase, pyt. En
+NAME      gineered: yes
+SOURCE    Homo sapiens. Human. Organism_taxid: 9606. Gene: ttk, mps1, mps1l1.  E
+SOURCE    xpressed in: escherichia coli. Expression_system_taxid: 562
+CATHCODE  1.10.510.10
+CLASS     Mainly Alpha
+ARCH      Orthogonal Bundle
+TOPOL     Transferase(Phosphotransferase); domain 1
+HOMOL     Transferase(Phosphotransferase) domain 1
+DLENGTH   164
+DSEQH     >pdb|4o6lB02
+DSEQS     IDLNSWLKKKKSIDPWERKSYWKNMLEAVHTIHQHGIVHSDLKPANFLIVDGMLKLIDFGIANQMQPGTV
+DSEQS     NYMPPEAIKDMISPKSDVWSLGCILYYMTYGKTPFQQIINQISKLHAIIDPNHEIEFPDIPEKDLQDVLK
+DSEQS     CCLKRDPKQRISIPELLAHPYVQI
+NSEGMENTS 1
+SEGMENT   4o6lB02:1:1
+SRANGE    START=607  STOP=793
+SLENGTH   164
+SSEQH     >pdb|4o6lB02:1:1
+SSEQS     IDLNSWLKKKKSIDPWERKSYWKNMLEAVHTIHQHGIVHSDLKPANFLIVDGMLKLIDFGIANQMQPGTV
+SSEQS     NYMPPEAIKDMISPKSDVWSLGCILYYMTYGKTPFQQIINQISKLHAIIDPNHEIEFPDIPEKDLQDVLK
+SSEQS     CCLKRDPKQRISIPELLAHPYVQI
+ENDSEG
+//
+FORMAT    CDDF1.0
+DOMAIN    1q31B02
+VERSION   4.3.0
+VERDATE   11-Sep-2019
+NAME      Nuclear inclusion protein a. Chain: a, b. Synonym: tobacco etch virus 
+NAME      protease. Engineered: yes. Mutation: yes
+SOURCE    Tobacco etch virus. Organism_taxid: 12227.  Expressed in: escherichia 
+SOURCE    coli. Expression_system_taxid: 562.
+CATHCODE  2.40.10.10
+CLASS     Mainly Beta
+ARCH      Beta Barrel
+TOPOL     Thrombin, subunit H
+HOMOL     Trypsin-like serine proteases
+DLENGTH   106
+DSEQH     >pdb|1q31B02
+DSEQS     ICHLTNESDGHTTSLYGIGFGPFIITNKHLFRRNNGTLLVQSLHGVFKVKNTTTLQQHLIDGRDMIIIRM
+DSEQS     PKDFPPFPQKLVPKNFMELLTNQEAQQWVSGWRLNA
+NSEGMENTS 2
+SEGMENT   1q31B02:1:2
+SRANGE    START=18  STOP=98
+SLENGTH   81
+SSEQH     >pdb|1q31B02:1:2
+SSEQS     ICHLTNESDGHTTSLYGIGFGPFIITNKHLFRRNNGTLLVQSLHGVFKVKNTTTLQQHLIDGRDMIIIRM
+SSEQS     PKDFPPFPQKL
+ENDSEG
+SEGMENT   1q31B02:2:2
+SRANGE    START=182  STOP=206
+SLENGTH   25
+SSEQH     >pdb|1q31B02:2:2
+SSEQS     VPKNFMELLTNQEAQQWVSGWRLNA
+ENDSEG
+//
+FORMAT    CDDF1.0
+DOMAIN    1lvbA02
+VERSION   4.3.0
+VERDATE   11-Sep-2019
+NAME      Catalytic domain of the nuclear inclusion protein a (nia). Chain: a, b
+NAME      . Engineered: yes. Mutation: yes. Oligopeptide substrate for the prote
+NAME      ase. Chain: c, d. Engineered: yes
+SOURCE    Tobacco etch virus. Organism_taxid: 12227.  Expressed in: escherichia 
+SOURCE    coli bl21(de3). Expression_system_taxid: 469008.
+CATHCODE  2.40.10.10
+CLASS     Mainly Beta
+ARCH      Beta Barrel
+TOPOL     Thrombin, subunit H
+HOMOL     Trypsin-like serine proteases
+DLENGTH   103
+DSEQH     >pdb|1lvbA02
+DSEQS     ICHLTNESDGHTTSLYGIGFGPFIITNKHLFRRNNGTLLVQSLHGVFKVKNTTTLQQHLIDGRDIIIRPK
+DSEQS     DFPPFPQKLVPKNFELLTNQEAQQWVSGWRLNA
+NSEGMENTS 2
+SEGMENT   1lvbA02:1:2
+SRANGE    START=18  STOP=98
+SLENGTH   79
+SSEQH     >pdb|1lvbA02:1:2
+SSEQS     ICHLTNESDGHTTSLYGIGFGPFIITNKHLFRRNNGTLLVQSLHGVFKVKNTTTLQQHLIDGRDIIIRPK
+SSEQS     DFPPFPQKL
+ENDSEG
+SEGMENT   1lvbA02:2:2
+SRANGE    START=182  STOP=206
+SLENGTH   24
+SSEQH     >pdb|1lvbA02:2:2
+SSEQS     VPKNFELLTNQEAQQWVSGWRLNA
+ENDSEG
+//
+FORMAT    CDDF1.0
+DOMAIN    1lvbB02
+VERSION   4.3.0
+VERDATE   11-Sep-2019
+NAME      Catalytic domain of the nuclear inclusion protein a (nia). Chain: a, b
+NAME      . Engineered: yes. Mutation: yes. Oligopeptide substrate for the prote
+NAME      ase. Chain: c, d. Engineered: yes
+SOURCE    Tobacco etch virus. Organism_taxid: 12227.  Expressed in: escherichia 
+SOURCE    coli bl21(de3). Expression_system_taxid: 469008.
+CATHCODE  2.40.10.10
+CLASS     Mainly Beta
+ARCH      Beta Barrel
+TOPOL     Thrombin, subunit H
+HOMOL     Trypsin-like serine proteases
+DLENGTH   103
+DSEQH     >pdb|1lvbB02
+DSEQS     ICHLTNESDGHTTSLYGIGFGPFIITNKHLFRRNNGTLLVQSLHGVFKVKNTTTLQQHLIDGRDIIIRPK
+DSEQS     DFPPFPQKLVPKNFELLTNQEAQQWVSGWRLNA
+NSEGMENTS 2
+SEGMENT   1lvbB02:1:2
+SRANGE    START=18  STOP=98
+SLENGTH   79
+SSEQH     >pdb|1lvbB02:1:2
+SSEQS     ICHLTNESDGHTTSLYGIGFGPFIITNKHLFRRNNGTLLVQSLHGVFKVKNTTTLQQHLIDGRDIIIRPK
+SSEQS     DFPPFPQKL
+ENDSEG
+SEGMENT   1lvbB02:2:2
+SRANGE    START=182  STOP=206
+SLENGTH   24
+SSEQH     >pdb|1lvbB02:2:2
+SSEQS     VPKNFELLTNQEAQQWVSGWRLNA
+ENDSEG
+//
+FORMAT    CDDF1.0
+DOMAIN    3su6A02
+VERSION   4.3.0
+VERDATE   11-Sep-2019
+NAME      Ns3 protease, ns4a protein. Chain: a. Fragment: ns4a (unp residues 167
+NAME      4-1688), ns3 (unp residues 1027- 1208). Engineered: yes. Mutation: yes
+SOURCE    Hepatitis c virus. Organism_taxid: 31646. Strain: subtype 1a, bid-v318
+SOURCE    . Gene: ns3-ns4a.  Expressed in: escherichia coli. Expression_system_t
+SOURCE    axid: 469008.
+CATHCODE  2.40.10.10
+CLASS     Mainly Beta
+ARCH      Beta Barrel
+TOPOL     Thrombin, subunit H
+HOMOL     Trypsin-like serine proteases
+DLENGTH   85
+DSEQH     >pdb|3su6A02
+DSEQS     TPCTCGSSDLYLVTRHADVIPVRRRGDSRGSLLSPRPISYLKGSAGGPLLCPAGHAVGIFRTAVSTRGVA
+DSEQS     KAVDFIPVESLETTM
+NSEGMENTS 1
+SEGMENT   3su6A02:1:1
+SRANGE    START=1095  STOP=1179
+SLENGTH   85
+SSEQH     >pdb|3su6A02:1:1
+SSEQS     TPCTCGSSDLYLVTRHADVIPVRRRGDSRGSLLSPRPISYLKGSAGGPLLCPAGHAVGIFRTAVSTRGVA
+SSEQS     KAVDFIPVESLETTM
+ENDSEG
+//
+FORMAT    CDDF1.0
+DOMAIN    1ceaA00
+VERSION   4.3.0
+VERDATE   11-Sep-2019
+NAME      Plasminogen. Chain: a, b. Fragment: kringle 1. Synonym: k1pg. Engineer
+NAME      ed: yes
+SOURCE    Homo sapiens. Human. Organism_taxid: 9606. Organ: blood.  Expressed in
+SOURCE    : escherichia coli. Expression_system_taxid: 562
+CATHCODE  2.40.20.10
+CLASS     Mainly Beta
+ARCH      Beta Barrel
+TOPOL     Plasminogen Kringle 4
+HOMOL     Plasminogen Kringle 4
+DLENGTH   80
+DSEQH     >pdb|1ceaA00
+DSEQS     ECKTGNGKNYRGTMSKTKNGITCQKWSSTSPHRPRFSPATHPSEGLEENYCRNPDNDPQGPWCYTTDPEK
+DSEQS     RYDYCDILEC
+NSEGMENTS 1
+SEGMENT   1ceaA00:1:1
+SRANGE    START=1A  STOP=79
+SLENGTH   80
+SSEQH     >pdb|1ceaA00:1:1
+SSEQS     ECKTGNGKNYRGTMSKTKNGITCQKWSSTSPHRPRFSPATHPSEGLEENYCRNPDNDPQGPWCYTTDPEK
+SSEQS     RYDYCDILEC
+ENDSEG
+//
