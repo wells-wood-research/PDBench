@@ -56,7 +56,7 @@ architectures={'1.10':'Orthogonal Bundle',
 def read_data(CATH_file: str, working_dir: str) -> pd.DataFrame:
     try:
         df=pd.read_csv(working_dir+CATH_file+'.csv', index_col=0)
-        #start stop needs to be str
+        #start, stop needs to be str
         df['start']=df['start'].apply(str)
         df['stop']=df['stop'].apply(str)
         return df
@@ -65,6 +65,7 @@ def read_data(CATH_file: str, working_dir: str) -> pd.DataFrame:
         cath_info=[]
         temp=[]
         start_stop=[]
+        #ftp://orengoftp.biochem.ucl.ac.uk/cath/releases/latest-release/cath-classification-data/
         for line in open(working_dir+CATH_file+'.txt'):
             if line[:6]=='DOMAIN': 
                 #PDB
@@ -78,9 +79,7 @@ def read_data(CATH_file: str, working_dir: str) -> pd.DataFrame:
             if line[:6]=='SRANGE':
                 j=line.split()
                 #start and stop resi, can be multiple for the same chain
-                #!!!!! 
-                # dealing with insertions, e.g. 1A, 1B, 1C. The letter is removed for compatibility with ampal
-                #!!!
+                #must be str to deal with insertions (1A,1B) later.
                 start_stop.append([str(j[1][6:]),str(j[2][5:])])
             if line[:2]=='//':
                 #keep fragments from the same chain as separate entries
@@ -94,15 +93,16 @@ def read_data(CATH_file: str, working_dir: str) -> pd.DataFrame:
 
 #gets fold sequence directly from PDB
 #sequences in original CATH txt file are missing uncommon residues, e.g. phosphoserine.
+#This method return normal amino acid if uncommon acid is encountered, e.g. phosposerine = S.
 def get_sequence(series: pd.Series) -> str:
     try:
         with gzip.open('/home/shared/datasets/pdb/'+series.PDB[1:3]+'/pdb'+series.PDB+'.ent.gz','rb') as protein:
                 assembly=ampal.load_pdb(protein.read().decode(), path=False)
                 #convert pdb res id into sequence index, 
-                #some files have discontinuous res ids so ampal.get_slice_from_res_id() does not work
+                #some files have discontinuous residue ids so ampal.get_slice_from_res_id() does not work
                 start=0
                 stop=0
-                #if nmr structure, get 1st model-fix this in the future
+                #if nmr structure, get 1st model
                 if isinstance(assembly,ampal.AmpalContainer):
                     chain=assembly[0][series.chain]
                 else:
