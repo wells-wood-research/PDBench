@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 import ampal
 import gzip
+import glob
+import subprocess
+import multiprocessing
 
 classes = {
     "1": "Mainly Alpha",
@@ -135,12 +138,11 @@ def get_sequence(series: pd.Series) -> str:
 
     Returns
     -------
-    If PDB exists, returns sequence. If not, returns np.NaN
+    If PDB exists, returns sequence, start index and stop index If not, returns np.NaN
 
     Notes
     -----
-    Sequences in original CATH .txt file are missing uncommon residues, e.g. phosphoserine.
-    This method return normal amino acid if uncommon acid is encountered, e.g. phosposerine = S."""
+    Unnatural amino acids are labelled x"""
 
     try:
         with gzip.open(
@@ -175,10 +177,18 @@ def get_sequence(series: pd.Series) -> str:
                 else:
                     if residue.id == series.stop:
                         stop = i
-        return chain[start : (stop + 1)].sequence
+        # remove 'X' and convert start/stop residues to list indexes
+        # Evo2EF skipps unnatural amino acids but AMPAL puts 'X'. string length and start/stop index must be checked
+        filtered_sequence = "".join([x for x in chain.sequence if x != "X"])
+        filtered_fragment = "".join(
+            [x for x in chain[start : (stop + 1)].sequence if x != "X"]
+        )
+        new_start = filtered_sequence.find(filtered_fragment)
+        new_stop = new_start + len(filtered_fragment) - 1
+        return filtered_fragment, new_start, new_stop
     # some pdbs are obsolete, return NaN
-    except FileNotFoundError:
-        return np.NaN
+    except:
+        return np.NaN, np.NaN, np.NaN
 
 
 def get_pdbs(
@@ -216,14 +226,14 @@ def get_pdbs(
             & (df["topology"] == topo)
             & (df["architecture"] == arch)
         ].copy()
-    elif a != 0:
+    elif arch != 0:
         return df.loc[(df["class"] == cls) & (df["architecture"] == arch)].copy()
     else:
         return df.loc[(df["class"] == cls)].copy()
 
 
 def append_sequence(df: pd.DataFrame) -> int:
-    """Get sequences for all entries in the dataframe, appends DataFrame inplace.
+    """Get sequences for all entries in the dataframe, appends DataFrame inplace, changes start and stop from PDB resid to index number.
 
     Parameters
     ----------
@@ -234,5 +244,635 @@ def append_sequence(df: pd.DataFrame) -> int:
     -------
     Number of CATH entries for which sequence was not found."""
 
-    df.loc[:, "sequence"] = [get_sequence(x) for i, x in df.iterrows()]
+    df.loc[:, "sequence"], df.loc[:, "start"], df.loc[:, "stop"] = zip(
+        *[get_sequence(x) for i, x in df.iterrows()]
+    )
     return df.sequence.isna().sum()
+
+
+def filter_with_pisces(df: pd.DataFrame, seq_id: int, res: float) -> pd.DataFrame:
+    """Takes CATH datarame and makes it non-redundant based on PISCES dataset
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        CATH DataFrame
+    seq_id: int
+        Sequence identity cutoff
+    res: float
+        Resolution cutoff
+
+    Returns
+    -------
+    A non-redundant DataFrame"""
+
+    # check for wrong inputs
+    allowed_seq_id = [20, 25, 30, 40, 50, 60, 70, 80, 90]
+    allowed_res = [1.6, 1.8, 2.0, 2.2, 2.5, 3.0]
+    if seq_id not in allowed_seq_id:
+        print("Check sequence id")
+        raise ValueError
+    elif res not in allowed_res:
+        print("Check resolution")
+        raise ValueError
+    # make copy to prevent changes in original df
+    frame_copy = df.copy()
+    frame_copy["PDB+chain"] = df.PDB + df.chain
+    # must be upper letters for string comparison
+    frame_copy["PDB+chain"] = frame_copy["PDB+chain"].str.upper()
+    path_to_pisces = [
+        x
+        for x in glob.glob(
+            "/home/shared/datasets/pisces/cullpdb_pc%i_res%.1f_*" % (seq_id, res)
+        )
+        if x[-5:] != "fasta"
+    ][0]
+    with open(path_to_pisces) as file:
+        pisces = [x.split()[0] for x in file.readlines()[1:]]
+    return df.loc[frame_copy["PDB+chain"].isin(pisces)]
+
+
+def filter_with_TS50(df: pd.DataFrame) -> pd.DataFrame:
+    """Takes CATH datarame and returns PDB chains from TS50 dataset
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        CATH DataFrame
+
+    Returns
+    -------
+    TS50 DataFrame
+
+    Reference
+    ----------
+     https://doi.org/10.1002/prot.25868 (ProDCoNN)"""
+    ts50 = [
+        "1AHSA",
+        "1BVYF",
+        "1PDOA",
+        "2VA0A",
+        "3IEYB",
+        "2XR6A",
+        "3II2A",
+        "1OR4A",
+        "2QDLA",
+        "3NZMA",
+        "3VJZA",
+        "1ETEA",
+        "2A2LA",
+        "2FVVA",
+        "3L4RA",
+        "1LPBA",
+        "3NNGA",
+        "2CVIA",
+        "3GKNA",
+        "2J49A",
+        "3FHKA",
+        "3PIVA",
+        "3LQCA",
+        "3GFSA",
+        "3E8MA",
+        "1DX5I",
+        "3NY7A",
+        "3K7PA",
+        "2CAYA",
+        "1I8NA",
+        "1V7MV",
+        "1H4AX",
+        "3T5GB",
+        "3Q4OA",
+        "3A4RA",
+        "2I39A",
+        "3AQGA",
+        "3EJFA",
+        "3NBKA",
+        "4GCNA",
+        "2XDGA",
+        "3GWIA",
+        "3HKLA",
+        "3SO6A",
+        "3ON9A",
+        "4DKCA",
+        "2GU3A",
+        "2XCJA",
+        "1Y1LA",
+        "1MR1C",
+    ]
+    frame_copy = df.copy()
+    frame_copy["PDB+chain"] = df.PDB + df.chain
+    # must be upper letters for string comparison
+    frame_copy["PDB+chain"] = frame_copy["PDB+chain"].str.upper()
+    return df.loc[frame_copy["PDB+chain"].isin(ts50)]
+
+
+def most_likely_sequence(sequence: list) -> str:
+    acids = {
+        0: "A",
+        1: "C",
+        2: "D",
+        3: "E",
+        4: "F",
+        5: "G",
+        6: "H",
+        7: "I",
+        8: "K",
+        9: "L",
+        10: "M",
+        11: "N",
+        12: "P",
+        13: "Q",
+        14: "R",
+        15: "S",
+        16: "T",
+        17: "W",
+        18: "Y",
+        19: "V",
+    }
+    seq = np.array(sequence)
+    probability_matrix = []
+    for x in range(20):
+        # rows represent amino acids, columns represent sequence.
+        probability_matrix.append(
+            [position.count(acids[x]) / len(position) for position in zip(*seq)]
+        )
+    probability_matrix = np.array(probability_matrix)
+    most_likely_sequence = [acids[x] for x in np.argmax(probability_matrix, axis=0)]
+    return "".join(most_likely_sequence)
+
+
+def lookup_blosum62(a: str, b: str) -> int:
+    """Returns score from the matrix.
+
+    Parameters
+    ----------
+    a: str
+        First residue code.
+    b: str
+        Second residue code.
+
+    Returns
+    --------
+    Score"""
+
+    blosum62 = {
+        ("W", "F"): 1,
+        ("L", "R"): -2,
+        ("S", "P"): -1,
+        ("V", "T"): 0,
+        ("Q", "Q"): 5,
+        ("N", "A"): -2,
+        ("Z", "Y"): -2,
+        ("W", "R"): -3,
+        ("Q", "A"): -1,
+        ("S", "D"): 0,
+        ("H", "H"): 8,
+        ("S", "H"): -1,
+        ("H", "D"): -1,
+        ("L", "N"): -3,
+        ("W", "A"): -3,
+        ("Y", "M"): -1,
+        ("G", "R"): -2,
+        ("Y", "I"): -1,
+        ("Y", "E"): -2,
+        ("B", "Y"): -3,
+        ("Y", "A"): -2,
+        ("V", "D"): -3,
+        ("B", "S"): 0,
+        ("Y", "Y"): 7,
+        ("G", "N"): 0,
+        ("E", "C"): -4,
+        ("Y", "Q"): -1,
+        ("Z", "Z"): 4,
+        ("V", "A"): 0,
+        ("C", "C"): 9,
+        ("M", "R"): -1,
+        ("V", "E"): -2,
+        ("T", "N"): 0,
+        ("P", "P"): 7,
+        ("V", "I"): 3,
+        ("V", "S"): -2,
+        ("Z", "P"): -1,
+        ("V", "M"): 1,
+        ("T", "F"): -2,
+        ("V", "Q"): -2,
+        ("K", "K"): 5,
+        ("P", "D"): -1,
+        ("I", "H"): -3,
+        ("I", "D"): -3,
+        ("T", "R"): -1,
+        ("P", "L"): -3,
+        ("K", "G"): -2,
+        ("M", "N"): -2,
+        ("P", "H"): -2,
+        ("F", "Q"): -3,
+        ("Z", "G"): -2,
+        ("X", "L"): -1,
+        ("T", "M"): -1,
+        ("Z", "C"): -3,
+        ("X", "H"): -1,
+        ("D", "R"): -2,
+        ("B", "W"): -4,
+        ("X", "D"): -1,
+        ("Z", "K"): 1,
+        ("F", "A"): -2,
+        ("Z", "W"): -3,
+        ("F", "E"): -3,
+        ("D", "N"): 1,
+        ("B", "K"): 0,
+        ("X", "X"): -1,
+        ("F", "I"): 0,
+        ("B", "G"): -1,
+        ("X", "T"): 0,
+        ("F", "M"): 0,
+        ("B", "C"): -3,
+        ("Z", "I"): -3,
+        ("Z", "V"): -2,
+        ("S", "S"): 4,
+        ("L", "Q"): -2,
+        ("W", "E"): -3,
+        ("Q", "R"): 1,
+        ("N", "N"): 6,
+        ("W", "M"): -1,
+        ("Q", "C"): -3,
+        ("W", "I"): -3,
+        ("S", "C"): -1,
+        ("L", "A"): -1,
+        ("S", "G"): 0,
+        ("L", "E"): -3,
+        ("W", "Q"): -2,
+        ("H", "G"): -2,
+        ("S", "K"): 0,
+        ("Q", "N"): 0,
+        ("N", "R"): 0,
+        ("H", "C"): -3,
+        ("Y", "N"): -2,
+        ("G", "Q"): -2,
+        ("Y", "F"): 3,
+        ("C", "A"): 0,
+        ("V", "L"): 1,
+        ("G", "E"): -2,
+        ("G", "A"): 0,
+        ("K", "R"): 2,
+        ("E", "D"): 2,
+        ("Y", "R"): -2,
+        ("M", "Q"): 0,
+        ("T", "I"): -1,
+        ("C", "D"): -3,
+        ("V", "F"): -1,
+        ("T", "A"): 0,
+        ("T", "P"): -1,
+        ("B", "P"): -2,
+        ("T", "E"): -1,
+        ("V", "N"): -3,
+        ("P", "G"): -2,
+        ("M", "A"): -1,
+        ("K", "H"): -1,
+        ("V", "R"): -3,
+        ("P", "C"): -3,
+        ("M", "E"): -2,
+        ("K", "L"): -2,
+        ("V", "V"): 4,
+        ("M", "I"): 1,
+        ("T", "Q"): -1,
+        ("I", "G"): -4,
+        ("P", "K"): -1,
+        ("M", "M"): 5,
+        ("K", "D"): -1,
+        ("I", "C"): -1,
+        ("Z", "D"): 1,
+        ("F", "R"): -3,
+        ("X", "K"): -1,
+        ("Q", "D"): 0,
+        ("X", "G"): -1,
+        ("Z", "L"): -3,
+        ("X", "C"): -2,
+        ("Z", "H"): 0,
+        ("B", "L"): -4,
+        ("B", "H"): 0,
+        ("F", "F"): 6,
+        ("X", "W"): -2,
+        ("B", "D"): 4,
+        ("D", "A"): -2,
+        ("S", "L"): -2,
+        ("X", "S"): 0,
+        ("F", "N"): -3,
+        ("S", "R"): -1,
+        ("W", "D"): -4,
+        ("V", "Y"): -1,
+        ("W", "L"): -2,
+        ("H", "R"): 0,
+        ("W", "H"): -2,
+        ("H", "N"): 1,
+        ("W", "T"): -2,
+        ("T", "T"): 5,
+        ("S", "F"): -2,
+        ("W", "P"): -4,
+        ("L", "D"): -4,
+        ("B", "I"): -3,
+        ("L", "H"): -3,
+        ("S", "N"): 1,
+        ("B", "T"): -1,
+        ("L", "L"): 4,
+        ("Y", "K"): -2,
+        ("E", "Q"): 2,
+        ("Y", "G"): -3,
+        ("Z", "S"): 0,
+        ("Y", "C"): -2,
+        ("G", "D"): -1,
+        ("B", "V"): -3,
+        ("E", "A"): -1,
+        ("Y", "W"): 2,
+        ("E", "E"): 5,
+        ("Y", "S"): -2,
+        ("C", "N"): -3,
+        ("V", "C"): -1,
+        ("T", "H"): -2,
+        ("P", "R"): -2,
+        ("V", "G"): -3,
+        ("T", "L"): -1,
+        ("V", "K"): -2,
+        ("K", "Q"): 1,
+        ("R", "A"): -1,
+        ("I", "R"): -3,
+        ("T", "D"): -1,
+        ("P", "F"): -4,
+        ("I", "N"): -3,
+        ("K", "I"): -3,
+        ("M", "D"): -3,
+        ("V", "W"): -3,
+        ("W", "W"): 11,
+        ("M", "H"): -2,
+        ("P", "N"): -2,
+        ("K", "A"): -1,
+        ("M", "L"): 2,
+        ("K", "E"): 1,
+        ("Z", "E"): 4,
+        ("X", "N"): -1,
+        ("Z", "A"): -1,
+        ("Z", "M"): -1,
+        ("X", "F"): -1,
+        ("K", "C"): -3,
+        ("B", "Q"): 0,
+        ("X", "B"): -1,
+        ("B", "M"): -3,
+        ("F", "C"): -2,
+        ("Z", "Q"): 3,
+        ("X", "Z"): -1,
+        ("F", "G"): -3,
+        ("B", "E"): 1,
+        ("X", "V"): -1,
+        ("F", "K"): -3,
+        ("B", "A"): -2,
+        ("X", "R"): -1,
+        ("D", "D"): 6,
+        ("W", "G"): -2,
+        ("Z", "F"): -3,
+        ("S", "Q"): 0,
+        ("W", "C"): -2,
+        ("W", "K"): -3,
+        ("H", "Q"): 0,
+        ("L", "C"): -1,
+        ("W", "N"): -4,
+        ("S", "A"): 1,
+        ("L", "G"): -4,
+        ("W", "S"): -3,
+        ("S", "E"): 0,
+        ("H", "E"): 0,
+        ("S", "I"): -2,
+        ("H", "A"): -2,
+        ("S", "M"): -1,
+        ("Y", "L"): -1,
+        ("Y", "H"): 2,
+        ("Y", "D"): -3,
+        ("E", "R"): 0,
+        ("X", "P"): -2,
+        ("G", "G"): 6,
+        ("G", "C"): -3,
+        ("E", "N"): 0,
+        ("Y", "T"): -2,
+        ("Y", "P"): -3,
+        ("T", "K"): -1,
+        ("A", "A"): 4,
+        ("P", "Q"): -1,
+        ("T", "C"): -1,
+        ("V", "H"): -3,
+        ("T", "G"): -2,
+        ("I", "Q"): -3,
+        ("Z", "T"): -1,
+        ("C", "R"): -3,
+        ("V", "P"): -2,
+        ("P", "E"): -1,
+        ("M", "C"): -1,
+        ("K", "N"): 0,
+        ("I", "I"): 4,
+        ("P", "A"): -1,
+        ("M", "G"): -3,
+        ("T", "S"): 1,
+        ("I", "E"): -3,
+        ("P", "M"): -2,
+        ("M", "K"): -1,
+        ("I", "A"): -1,
+        ("P", "I"): -3,
+        ("R", "R"): 5,
+        ("X", "M"): -1,
+        ("L", "I"): 2,
+        ("X", "I"): -1,
+        ("Z", "B"): 1,
+        ("X", "E"): -1,
+        ("Z", "N"): 0,
+        ("X", "A"): 0,
+        ("B", "R"): -1,
+        ("B", "N"): 3,
+        ("F", "D"): -3,
+        ("X", "Y"): -1,
+        ("Z", "R"): 0,
+        ("F", "H"): -1,
+        ("B", "F"): -3,
+        ("F", "L"): 0,
+        ("X", "Q"): -1,
+        ("B", "B"): 4,
+    }
+    if (a, b) in blosum62.keys():
+        return blosum62[a, b]
+    else:
+        return blosum62[b, a]
+
+
+def sequence_recovery(true_seq: str, predicted_seq: str) -> float:
+    """Calculates sequence recovery.
+
+    Parameters
+    ----------
+    true_seq: str,
+        True sequence.
+    predicted_seq: str
+        Predicted sequence.
+
+    Returns
+    --------
+    Sequence recovery rate"""
+
+    correct = 0
+    for i, acid in enumerate(true_seq):
+        if acid == predicted_seq[i]:
+            correct = correct + 1
+    return correct / len(predicted_seq)
+
+
+def fuzzy_score(true_seq: str, predicted_seq: str) -> float:
+
+    """Calculates fuzzy sequence recovery, amino acids of the same type (positive blosum62 score) are considered as correct predictions.
+
+    Parameters
+    ----------
+    true_seq: str,
+        True sequence.
+    predicted_seq: str
+        Predicted sequence.
+
+    Returns
+    --------
+    Fuzzy sequence recovery rate
+
+    Reference
+    ---------
+    https://doi.org/10.1002/prot.25868 (ProDCoNN)"""
+
+    correct = 0
+    for i, acid in enumerate(true_seq):
+        if lookup_blosum62(acid, predicted_seq[i]) > 0:
+            correct = correct + 1
+    return correct / len(true_seq)
+
+
+def run_Evo2EF(path: str, pdb: str, chain: str, number_of_runs: str):
+    """Runs a shell script to predict sequence with EvoEF2
+
+    Patameters
+    ----------
+    path: str
+        Path to PDB biological unit.
+    pdb: str
+        PDB code.
+    chain: str
+        Chain code.
+    number_of_runs: str
+       Number of sequences to be generated.
+
+    Returns
+    -------
+    Nothing."""
+
+    p = subprocess.Popen(
+        [
+            "/home/s1706179/project/sequence-recovery-benchmark/evo.sh",
+            path,
+            pdb,
+            chain,
+            number_of_runs,
+        ]
+    )
+    p.wait()
+    print("%s%s done" % (pdb, chain))
+
+
+def multi_Evo2EF(df: pd.DataFrame, number_of_runs: int, max_processes: int = 8):
+    """Runs Evo2EF on all PDB chains in the DataFrame.
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        DataFrame with PDB and chain codes.
+    number_of_runs: int
+        Number of sequences to be generated for each PDB file.
+    max_processes: int = 8
+        Number of cores to use, default is 8.
+    Returns
+    --------
+    Nothing."""
+
+    inputs = []
+    # remove duplicated chains
+    df = df.drop_duplicates(subset=["PDB", "chain"])
+    for i, protein in df.iterrows():
+        path = (
+            "/home/shared/datasets/biounit/"
+            + protein.PDB[1:3]
+            + "/"
+            + protein.PDB
+            + ".pdb1.gz"
+        )
+        inputs.append((path, protein.PDB, protein.chain, str(number_of_runs)))
+    with multiprocessing.Pool(max_processes) as P:
+        P.starmap(run_Evo2EF, inputs)
+
+
+def load_predictions(df: pd.DataFrame) -> pd.DataFrame:
+    predicted_sequences = []
+    for i, protein in df.iterrows():
+        try:
+            with open(
+                "/home/s1706179/project/sequence-recovery-benchmark/evo_dataset/%s%s.txt"
+                % (protein.PDB, protein.chain)
+            ) as prediction:
+                predicted_sequences.append(
+                    [y.split()[0] for y in prediction.readlines()]
+                )
+        except FileNotFoundError:
+            print("%s%s prediction does not exits." % (protein.PDB, protein.chain))
+            predicted_sequences.append(np.NaN)
+    df["predicted_sequences"] = predicted_sequences
+    return df
+
+
+def score(df: pd.DataFrame, score_type: str = "sequence_recovery") -> list:
+    """Scores all predicted sequences in the DataFrame.
+
+    Parameters
+    ----------
+    df: pd.DataFrame
+        DataFrame with CATH fragment info. The frame must have predicted sequence, true sequence and start/stop index of CATH fragment.
+    score_type: str ='sequence_recovery'
+        Can choose between 'sequence_recovery' and 'fuzzy score'.
+
+    Returns
+    --------
+    A list with scores."""
+
+    scores = []
+    for i, protein in df.iterrows():
+        # supports multiple predictions
+        start = protein.start
+        stop = protein.stop
+        # check if sequence exists
+        if protein.predicted_sequences == []:
+            print("Check %s %s, something went wrong" % (protein.PDB, protein.chain))
+            scores.append(None)
+        elif protein.predicted_sequences[0] == "0":
+            print("Check %s %s, something went wrong" % (protein.PDB, protein.chain))
+            scores.append(None)
+        # check if length matches
+        elif len(protein.predicted_sequences[0][start : stop + 1]) == len(
+            protein.sequence
+        ):
+            if score_type == "sequence_recovery":
+                scores.append(
+                    [
+                        sequence_recovery(
+                            protein.sequence, prediction[start : stop + 1]
+                        )
+                        for prediction in protein.predicted_sequences
+                    ]
+                )
+            elif score_type == "fuzzy_score":
+                scores.append(
+                    [
+                        fuzzy_score(protein.sequence, prediction[start : stop + 1])
+                        for prediction in protein.predicted_sequences
+                    ]
+                )
+        else:
+            print("Check %s %s, something went wrong" % (protein.PDB, protein.chain))
+            scores.append(None)
+    return scores
