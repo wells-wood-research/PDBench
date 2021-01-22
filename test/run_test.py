@@ -38,10 +38,10 @@ def test_load_CATH():
     df_with_predictions = get_cath.load_predictions(example_with_sequence)
     scores = get_cath.score(df_with_predictions)
     assert (
-        abs(scores[0][1] - 0.3050847457627119) <= 0.0001
+        abs(scores[0][1] - 0.266949) <= 0.001
     ), "Sequence recovery calculated incorrectly"
 
     fuzzy_scores = get_cath.score(df_with_predictions, "fuzzy_score")
     assert (
-        abs(fuzzy_scores[0][1] - 0.5254237288135594) <= 0.0001
+        abs(fuzzy_scores[0][1] - 0.508475) <= 0.001
     ), "Fuzzy sequence recovery calculated incorrectly"

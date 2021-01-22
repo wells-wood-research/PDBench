@@ -232,8 +232,8 @@ def get_pdbs(
         return df.loc[(df["class"] == cls)].copy()
 
 
-def append_sequence(df: pd.DataFrame) -> int:
-    """Get sequences for all entries in the dataframe, appends DataFrame inplace, changes start and stop from PDB resid to index number.
+def append_sequence(df: pd.DataFrame) -> pd.DataFrame:
+    """Get sequences for all entries in the dataframe, changes start and stop from PDB resid to index number.
 
     Parameters
     ----------
@@ -242,12 +242,20 @@ def append_sequence(df: pd.DataFrame) -> int:
 
     Returns
     -------
-    Number of CATH entries for which sequence was not found."""
+    DataFrame with existing sequences"""
+    working_copy = df.copy()
 
-    df.loc[:, "sequence"], df.loc[:, "start"], df.loc[:, "stop"] = zip(
-        *[get_sequence(x) for i, x in df.iterrows()]
-    )
-    return df.sequence.isna().sum()
+    (
+        working_copy.loc[:, "sequence"],
+        working_copy.loc[:, "start"],
+        working_copy.loc[:, "stop"],
+    ) = zip(*[get_sequence(x) for i, x in df.iterrows()])
+    # remove missing entries
+    working_copy.dropna(inplace=True)
+    # change index from float to int
+    working_copy.loc[:, "start"] = working_copy["start"].apply(int)
+    working_copy.loc[:, "stop"] = working_copy["stop"].apply(int)
+    return working_copy
 
 
 def filter_with_pisces(df: pd.DataFrame, seq_id: int, res: float) -> pd.DataFrame:
@@ -264,7 +272,11 @@ def filter_with_pisces(df: pd.DataFrame, seq_id: int, res: float) -> pd.DataFram
 
     Returns
     -------
-    A non-redundant DataFrame"""
+    A non-redundant DataFrame
+
+    Raises
+    ------
+    ValueError if seq id or resolution is incorrect"""
 
     # check for wrong inputs
     allowed_seq_id = [20, 25, 30, 40, 50, 60, 70, 80, 90]
@@ -817,7 +829,11 @@ def load_predictions(df: pd.DataFrame) -> pd.DataFrame:
                 % (protein.PDB, protein.chain)
             ) as prediction:
                 predicted_sequences.append(
-                    [y.split()[0] for y in prediction.readlines()]
+                    [
+                        y.split()[0]
+                        for y in prediction.readlines()
+                        if y.split()[0] != "0"
+                    ]
                 )
         except FileNotFoundError:
             print("%s%s prediction does not exits." % (protein.PDB, protein.chain))
@@ -848,31 +864,34 @@ def score(df: pd.DataFrame, score_type: str = "sequence_recovery") -> list:
         # check if sequence exists
         if protein.predicted_sequences == []:
             print("Check %s %s, something went wrong" % (protein.PDB, protein.chain))
-            scores.append(None)
-        elif protein.predicted_sequences[0] == "0":
-            print("Check %s %s, something went wrong" % (protein.PDB, protein.chain))
-            scores.append(None)
+            scores.append(np.NaN)
         # check if length matches
         elif len(protein.predicted_sequences[0][start : stop + 1]) == len(
             protein.sequence
         ):
             if score_type == "sequence_recovery":
                 scores.append(
-                    [
-                        sequence_recovery(
-                            protein.sequence, prediction[start : stop + 1]
-                        )
-                        for prediction in protein.predicted_sequences
-                    ]
+                    sum(
+                        [
+                            sequence_recovery(
+                                protein.sequence, prediction[start : stop + 1]
+                            )
+                            for prediction in protein.predicted_sequences
+                        ]
+                    )
+                    / len(protein.predicted_sequences)
                 )
             elif score_type == "fuzzy_score":
                 scores.append(
-                    [
-                        fuzzy_score(protein.sequence, prediction[start : stop + 1])
-                        for prediction in protein.predicted_sequences
-                    ]
+                    sum(
+                        [
+                            fuzzy_score(protein.sequence, prediction[start : stop + 1])
+                            for prediction in protein.predicted_sequences
+                        ]
+                    )
+                    / len(protein.predicted_sequences)
                 )
         else:
             print("Check %s %s, something went wrong" % (protein.PDB, protein.chain))
-            scores.append(None)
+            scores.append(np.NaN)
     return scores
