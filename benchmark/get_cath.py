@@ -128,6 +128,37 @@ def read_data(CATH_file: str, working_dir: str) -> pd.DataFrame:
         df.to_csv(working_dir + CATH_file + ".csv")
         return df
 
+def tag_dssp_data(assembly: ampal.Assembly):
+    """Same as ampal.dssp.tag_dssp_data(), but fixed a bug with insertions. Tags each residue in ampal.Assembly with secondary structure.
+
+    Parameters
+    ----------
+    assembly: ampal.Assembly
+        Protein assembly."""
+
+    dssp_out = ampal.dssp.run_dssp(assembly.pdb, path=False)
+    dssp_data = ampal.dssp.extract_all_ss_dssp(dssp_out, path=False)
+    for i,record in enumerate(dssp_data):
+        rnum, sstype, chid, _, phi, psi, sacc = record
+        #deal with insertions
+        if len(chid)>1:
+            for i,res in enumerate(assembly[chid[1]]):
+                if res.insertion_code==chid[0] and res.tags=={}:
+                    assembly[chid[1]][i].tags['dssp_data'] = {
+                    'ss_definition': sstype,
+                    'solvent_accessibility': sacc,
+                    'phi': phi,
+                    'psi': psi
+                    }
+                    break
+        else:
+            assembly[chid][str(rnum)].tags['dssp_data'] = {
+            'ss_definition': sstype,
+            'solvent_accessibility': sacc,
+            'phi': phi,
+            'psi': psi
+            }
+
 
 def get_sequence(series: pd.Series) -> str:
     """Gets a sequence of from PDB file, CATH fragment indexes and secondary structure labels.
@@ -155,6 +186,8 @@ def get_sequence(series: pd.Series) -> str:
             "rb",
         ) as protein:
             assembly = ampal.load_pdb(protein.read().decode(), path=False)
+            # run dssp
+            tag_dssp_data(assembly)
             # convert pdb res id into sequence index,
             # some files have discontinuous residue ids so ampal.get_slice_from_res_id() does not work
             start = 0
@@ -186,14 +219,14 @@ def get_sequence(series: pd.Series) -> str:
         )
         new_start = filtered_sequence.find(filtered_fragment)
         new_stop = new_start + len(filtered_fragment) - 1
-        # run dssp
-        ampal.dssp.tag_dssp_data(assembly, loop_assignments=(" "))
+        
         dssp = "".join(
-            [x.tags["dssp_data"]["ss_definition"] for x in chain if x.id != "X"]
+            [x.tags['dssp_data']['ss_definition'] for x in chain if x.id != "X"]
         )
         return filtered_sequence, dssp, new_start, new_stop
     # some pdbs are obsolete, return NaN
-    except:
+    except FileNotFoundError:
+        print("%s missing" %series.PDB)
         return np.NaN, np.NaN, np.NaN, np.NaN
 
 
@@ -906,7 +939,7 @@ def load_predictions(df: pd.DataFrame) -> pd.DataFrame:
         Returns
         -------
         DataFrame with appended prediction."""
-        
+
     predicted_sequences = []
     for i, protein in df.iterrows():
         path = (
