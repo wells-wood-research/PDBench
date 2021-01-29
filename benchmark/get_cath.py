@@ -1,4 +1,4 @@
-"""Functions for creating CATH datasets"""
+"""Functions for creating and scoring CATH datasets"""
 
 import numpy as np
 import pandas as pd
@@ -7,6 +7,7 @@ import gzip
 import glob
 import subprocess
 import multiprocessing
+import os
 
 classes = {
     "1": "Mainly Alpha",
@@ -129,7 +130,7 @@ def read_data(CATH_file: str, working_dir: str) -> pd.DataFrame:
 
 
 def get_sequence(series: pd.Series) -> str:
-    """Gets a sequence of CATH structure segment from PDB file.
+    """Gets a sequence of from PDB file, CATH fragment indexes and secondary structure labels.
 
     Parameters
     ----------
@@ -138,11 +139,11 @@ def get_sequence(series: pd.Series) -> str:
 
     Returns
     -------
-    If PDB exists, returns sequence, start index and stop index If not, returns np.NaN
+    If PDB exists, returns sequence, dssp sequence, and start and stop index for CATH fragment. If not, returns np.NaN
 
     Notes
     -----
-    Unnatural amino acids are labelled x"""
+    Unnatural amino acids are removed"""
 
     try:
         with gzip.open(
@@ -178,17 +179,22 @@ def get_sequence(series: pd.Series) -> str:
                     if residue.id == series.stop:
                         stop = i
         # remove 'X' and convert start/stop residues to list indexes
-        # Evo2EF skipps unnatural amino acids but AMPAL puts 'X'. string length and start/stop index must be checked
+        # Evo2EF skips unnatural amino acids but AMPAL puts 'X'. string length and start/stop index must be checked
         filtered_sequence = "".join([x for x in chain.sequence if x != "X"])
         filtered_fragment = "".join(
             [x for x in chain[start : (stop + 1)].sequence if x != "X"]
         )
         new_start = filtered_sequence.find(filtered_fragment)
         new_stop = new_start + len(filtered_fragment) - 1
-        return filtered_fragment, new_start, new_stop
+        # run dssp
+        ampal.dssp.tag_dssp_data(assembly, loop_assignments=(" "))
+        dssp = "".join(
+            [x.tags["dssp_data"]["ss_definition"] for x in chain if x.id != "X"]
+        )
+        return filtered_sequence, dssp, new_start, new_stop
     # some pdbs are obsolete, return NaN
     except:
-        return np.NaN, np.NaN, np.NaN
+        return np.NaN, np.NaN, np.NaN, np.NaN
 
 
 def get_pdbs(
@@ -247,6 +253,7 @@ def append_sequence(df: pd.DataFrame) -> pd.DataFrame:
 
     (
         working_copy.loc[:, "sequence"],
+        working_copy.loc[:, "dssp"],
         working_copy.loc[:, "start"],
         working_copy.loc[:, "stop"],
     ) = zip(*[get_sequence(x) for i, x in df.iterrows()])
@@ -376,9 +383,32 @@ def filter_with_TS50(df: pd.DataFrame) -> pd.DataFrame:
     # must be upper letters for string comparison
     frame_copy["PDB+chain"] = frame_copy["PDB+chain"].str.upper()
     return df.loc[frame_copy["PDB+chain"].isin(ts50)]
+    
+def filter_with_user_list(df: pd.DataFrame, path: str)->pd.DataFrame:
+    """Selects PDB chains specified in .txt file.
+    Parameters
+    ----------
+    df: pd.DataFrame
+        CATH info containing dataframe
+    path: str
+        Path to .txt file
+    
+    Returns
+    -------
+    DataFrame with selected chains."""
 
+    with open(path) as file:
+        filtr=[x.upper().strip('\n') for x in file.readlines()]
+    frame_copy = df.copy()
+    frame_copy["PDB+chain"] = df.PDB + df.chain
+    # must be upper letters for string comparison
+    frame_copy["PDB+chain"] = frame_copy["PDB+chain"].str.upper()
+    return df.loc[frame_copy["PDB+chain"].isin(filtr)]
 
 def most_likely_sequence(sequence: list) -> str:
+    """Generates consensus sequence from multiple predictions.
+    Unused at the moment."""
+
     acids = {
         0: "A",
         1: "C",
@@ -732,9 +762,9 @@ def sequence_recovery(true_seq: str, predicted_seq: str) -> float:
     return correct / len(predicted_seq)
 
 
-def fuzzy_score(true_seq: str, predicted_seq: str) -> float:
+def similarity_score(true_seq: str, predicted_seq: str) -> float:
 
-    """Calculates fuzzy sequence recovery, amino acids of the same type (positive blosum62 score) are considered as correct predictions.
+    """Calculates similar sequence recovery, amino acids of the same type (positive blosum62 score) are considered as correct predictions.
 
     Parameters
     ----------
@@ -745,7 +775,7 @@ def fuzzy_score(true_seq: str, predicted_seq: str) -> float:
 
     Returns
     --------
-    Fuzzy sequence recovery rate
+    Similar sequence recovery rate
 
     Reference
     ---------
@@ -756,6 +786,52 @@ def fuzzy_score(true_seq: str, predicted_seq: str) -> float:
         if lookup_blosum62(acid, predicted_seq[i]) > 0:
             correct = correct + 1
     return correct / len(true_seq)
+
+
+def secondary_sctructure_score(true_seq: str, predicted_seq: str, dssp: str) -> list:
+    """Calculates sequence recovery rate for each secondary structure type.
+
+    Parameters
+    ----------
+    true_seq: str,
+        True sequence.
+    predicted_seq: str
+        Predicted sequence.
+    dssp: str
+        string with dssp resutls
+
+    Returns
+    -------
+    List with sequence recovery for helices, beta sheets, random coils and structured loops"""
+
+    correct = {"H": 0, " ": 0, "I": 0, "B": 0, "E": 0, "G": 0, "T": 0, "S": 0}
+    counts = {"H": 0, " ": 0, "I": 0, "B": 0, "E": 0, "G": 0, "T": 0, "S": 0}
+    for i, acid in enumerate(true_seq):
+        counts[dssp[i]] += 1
+        if acid == predicted_seq[i]:
+            correct[dssp[i]] += 1
+    # simplify dssp results into alpha, beta strctures, random coils and structured turns
+    try:
+        alpha = (correct["H"] + correct["I"] + correct["G"]) / (
+            counts["H"] + counts["I"] + counts["G"]
+        )
+    except ZeroDivisionError:
+        alpha = np.NaN
+    try:
+        beta = correct["E"] / counts["E"]
+    except ZeroDivisionError:
+        beta = np.NaN
+    try:
+        random = correct[" "] / counts[" "]
+    except ZeroDivisionError:
+        random = np.NaN
+    try:
+        structured = (correct["B"] + correct["T"] + correct["S"]) / (
+            counts["B"] + counts["T"] + counts["S"]
+        )
+    except ZeroDivisionError:
+        structured = np.NaN
+    return [alpha, beta, random, structured]
 
 
 def run_Evo2EF(path: str, pdb: str, chain: str, number_of_runs: str):
@@ -821,28 +897,62 @@ def multi_Evo2EF(df: pd.DataFrame, number_of_runs: int, max_processes: int = 8):
 
 
 def load_predictions(df: pd.DataFrame) -> pd.DataFrame:
+    """Loads predicted sequences from .txt to CATH DataFrame, drops entries for which sequence prediction fails.
+        Parameters
+        ----------
+        df: pd.DataFrame
+            CATH dataframe
+        
+        Returns
+        -------
+        DataFrame with appended prediction."""
+        
     predicted_sequences = []
     for i, protein in df.iterrows():
-        try:
-            with open(
-                "/home/s1706179/project/sequence-recovery-benchmark/evo_dataset/%s%s.txt"
-                % (protein.PDB, protein.chain)
-            ) as prediction:
-                predicted_sequences.append(
-                    [
-                        y.split()[0]
-                        for y in prediction.readlines()
-                        if y.split()[0] != "0"
-                    ]
-                )
-        except FileNotFoundError:
+        path = (
+            "/home/s1706179/project/sequence-recovery-benchmark/evo_dataset/%s%s.txt"
+            % (protein.PDB, protein.chain)
+        )
+        # check for empty and missing files
+        if os.path.isfile(path) and os.path.getsize(path) > 0:
+            with open(path) as prediction:
+                prediction = [
+                    y.split()[0] for y in prediction.readlines() if y.split()[0] != "0"
+                ]
+                if prediction == []:
+                    print(
+                        "%s%s prediction does not exits." % (protein.PDB, protein.chain)
+                    )
+                    predicted_sequences.append(np.NaN)
+                elif len(prediction[0]) != len(protein.sequence):
+                    # assume that biological assembly is a multimer and hope for the best
+                    if len(prediction[0]) % len(protein.sequence) == 0:
+                        prediction = [x[0 : len(protein.sequence)] for x in prediction]
+                        print(
+                            "%s%s prediction is a multimer"
+                            % (protein.PDB, protein.chain)
+                        )
+                        predicted_sequences.append(prediction)
+                    else:
+                        print(
+                            "%s%s prediction and true sequence have different length."
+                            % (protein.PDB, protein.chain)
+                        )
+                        predicted_sequences.append(np.NaN)
+                else:
+                    predicted_sequences.append(prediction)
+        else:
             print("%s%s prediction does not exits." % (protein.PDB, protein.chain))
             predicted_sequences.append(np.NaN)
     df["predicted_sequences"] = predicted_sequences
+    df.dropna(inplace=True)
+    # drop empty lists
     return df
 
 
-def score(df: pd.DataFrame, score_type: str = "sequence_recovery") -> list:
+def score(
+    df: pd.DataFrame, score_type: str = "both", include_secondary: bool = True
+) -> pd.DataFrame:
     """Scores all predicted sequences in the DataFrame.
 
     Parameters
@@ -850,13 +960,16 @@ def score(df: pd.DataFrame, score_type: str = "sequence_recovery") -> list:
     df: pd.DataFrame
         DataFrame with CATH fragment info. The frame must have predicted sequence, true sequence and start/stop index of CATH fragment.
     score_type: str ='sequence_recovery'
-        Can choose between 'sequence_recovery' and 'fuzzy score'.
+        Can choose between 'sequence_recovery','similarity_score' or 'both'.
+    include_secondary: if True, calculates sequence recovery for each secondary structure type [helices, sheets, random coil, structured loops]
 
     Returns
     --------
-    A list with scores."""
+    DataFrame with calculated scores, columns with NaN are droped"""
 
     scores = []
+    similarity = []
+    secondary = []
     for i, protein in df.iterrows():
         # supports multiple predictions
         start = protein.start
@@ -865,33 +978,53 @@ def score(df: pd.DataFrame, score_type: str = "sequence_recovery") -> list:
         if protein.predicted_sequences == []:
             print("Check %s %s, something went wrong" % (protein.PDB, protein.chain))
             scores.append(np.NaN)
-        # check if length matches
-        elif len(protein.predicted_sequences[0][start : stop + 1]) == len(
-            protein.sequence
-        ):
-            if score_type == "sequence_recovery":
-                scores.append(
-                    sum(
-                        [
-                            sequence_recovery(
-                                protein.sequence, prediction[start : stop + 1]
-                            )
-                            for prediction in protein.predicted_sequences
-                        ]
-                    )
-                    / len(protein.predicted_sequences)
+            similarity.append(np.NaN)
+            continue
+        start = protein.start
+        stop = protein.stop
+
+        if score_type == "sequence_recovery" or score_type == "both":
+            scores.append(
+                sum(
+                    [
+                        sequence_recovery(
+                            protein.sequence[start : stop + 1],
+                            prediction[start : stop + 1],
+                        )
+                        for prediction in protein.predicted_sequences
+                    ]
                 )
-            elif score_type == "fuzzy_score":
-                scores.append(
-                    sum(
-                        [
-                            fuzzy_score(protein.sequence, prediction[start : stop + 1])
-                            for prediction in protein.predicted_sequences
-                        ]
-                    )
-                    / len(protein.predicted_sequences)
+                / len(protein.predicted_sequences)
+            )
+        if score_type == "similarity_score" or score_type == "both":
+            similarity.append(
+                sum(
+                    [
+                        similarity_score(
+                            protein.sequence[start : stop + 1],
+                            prediction[start : stop + 1],
+                        )
+                        for prediction in protein.predicted_sequences
+                    ]
                 )
-        else:
-            print("Check %s %s, something went wrong" % (protein.PDB, protein.chain))
-            scores.append(np.NaN)
-    return scores
+                / len(protein.predicted_sequences)
+            )
+        if include_secondary:
+            temp = []
+            temp += [
+                secondary_sctructure_score(protein.sequence, prediction, protein.dssp)
+                for prediction in protein.predicted_sequences
+            ]
+            temp = np.array(temp)
+            secondary.append(temp.sum(axis=0) / len(protein.predicted_sequences))
+    if score_type == "sequence_recovery" or score_type == "both":
+        df["sequence_recovery"] = scores
+    if score_type == "fuzzy_score" or score_type == "both":
+        df["similarity_score"] = similarity
+    if include_secondary:
+        secondary = np.hsplit(np.array(secondary), 4)
+        df["a_helix"] = secondary[0]
+        df["b_sheet"] = secondary[1]
+        df["random_coil"] = secondary[2]
+        df["structured_loop"] = secondary[3]
+    return df

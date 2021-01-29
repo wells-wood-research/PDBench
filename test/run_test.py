@@ -17,11 +17,11 @@ def test_load_CATH():
     ), "PDBs returned incorrectly"
 
     # check sequence
-    get_cath.append_sequence(pdbs)
-    assert pdbs.shape == (7, 9), "Sequence appenden incorrectly"
+    pdbs=get_cath.append_sequence(pdbs)
+    assert pdbs.shape == (7, 10), "Sequence appenden incorrectly"
 
     example_with_insertion = get_cath.get_pdbs(cath_df, 2, 40, 20, 10)
-    get_cath.append_sequence(example_with_insertion)
+    example_with_insertion=get_cath.append_sequence(example_with_insertion)
     assert (
         example_with_insertion[example_with_insertion.PDB == "1cea"].sequence.values[0]
         == "ECKTGNGKNYRGTMSKTKNGITCQKWSSTSPHRPRFSPATHPSEGLEENYCRNPDNDPQGPWCYTTDPEKRYDYCDILEC"
@@ -34,7 +34,7 @@ def test_load_CATH():
 
     # check sequence recovery rate
     example_with_sequence = get_cath.get_pdbs(new_df, 1, 10, 8, 10)
-    get_cath.append_sequence(example_with_sequence)
+    example_with_sequence=get_cath.append_sequence(example_with_sequence)
     df_with_predictions = get_cath.load_predictions(example_with_sequence)
     scores = get_cath.score(df_with_predictions)
     assert (
