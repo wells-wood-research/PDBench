@@ -8,6 +8,7 @@ import glob
 import subprocess
 import multiprocessing
 import os
+import pathlib
 
 classes = {
     "1": "Mainly Alpha",
@@ -78,14 +79,15 @@ def read_data(CATH_file: str, working_dir: str) -> pd.DataFrame:
     -------
     DataFrame containing CATH and PDB codes."""
 
-    try:
+    #load .csv if exists, faster than reading .txt
+    if pathlib.Path(working_dir + CATH_file + ".csv").exists():
         df = pd.read_csv(working_dir + CATH_file + ".csv", index_col=0)
         # start, stop needs to be str
         df["start"] = df["start"].apply(str)
         df["stop"] = df["stop"].apply(str)
         return df
 
-    except IOError:
+    else:
         cath_info = []
         temp = []
         start_stop = []
@@ -143,7 +145,7 @@ def tag_dssp_data(assembly: ampal.Assembly):
         #deal with insertions
         if len(chid)>1:
             for i,res in enumerate(assembly[chid[1]]):
-                if res.insertion_code==chid[0] and res.tags=={}:
+                if res.insertion_code==chid[0] and assembly[chid[1]][i].tags=={}:
                     assembly[chid[1]][i].tags['dssp_data'] = {
                     'ss_definition': sstype,
                     'solvent_accessibility': sacc,
@@ -151,6 +153,7 @@ def tag_dssp_data(assembly: ampal.Assembly):
                     'psi': psi
                     }
                     break
+                
         else:
             assembly[chid][str(rnum)].tags['dssp_data'] = {
             'ss_definition': sstype,
@@ -158,7 +161,6 @@ def tag_dssp_data(assembly: ampal.Assembly):
             'phi': phi,
             'psi': psi
             }
-
 
 def get_sequence(series: pd.Series) -> str:
     """Gets a sequence of from PDB file, CATH fragment indexes and secondary structure labels.
@@ -186,17 +188,15 @@ def get_sequence(series: pd.Series) -> str:
             "rb",
         ) as protein:
             assembly = ampal.load_pdb(protein.read().decode(), path=False)
-            # run dssp
-            tag_dssp_data(assembly)
+            
             # convert pdb res id into sequence index,
             # some files have discontinuous residue ids so ampal.get_slice_from_res_id() does not work
             start = 0
             stop = 0
             # if nmr structure, get 1st model
             if isinstance(assembly, ampal.AmpalContainer):
-                chain = assembly[0][series.chain]
-            else:
-                chain = assembly[series.chain]
+                assembly = assembly[0]
+            chain = assembly[series.chain]
             for i, residue in enumerate(chain):
                 # deal with insertions
                 if series.start[-1].isalpha():
@@ -219,16 +219,21 @@ def get_sequence(series: pd.Series) -> str:
         )
         new_start = filtered_sequence.find(filtered_fragment)
         new_stop = new_start + len(filtered_fragment) - 1
-        
-        dssp = "".join(
+        try:
+            tag_dssp_data(assembly)
+            dssp = "".join(
             [x.tags['dssp_data']['ss_definition'] for x in chain if x.id != "X"]
-        )
+            )
+        #dssp can fail on some broken residues(e.g., missing side chain)     
+        except KeyError:
+            dssp=np.NaN
+               
+        
         return filtered_sequence, dssp, new_start, new_stop
-    # some pdbs are obsolete, return NaN
-    except FileNotFoundError:
-        print("%s missing" %series.PDB)
+    # some pdbs are obsolete or broken, return NaN
+    except (FileNotFoundError, ValueError):
+        print("%s.pdb is missing or broken." %series.PDB)
         return np.NaN, np.NaN, np.NaN, np.NaN
-
 
 def get_pdbs(
     df: pd.DataFrame, cls: int, arch: int = 0, topo: int = 0, homologous_sf: int = 0
@@ -298,21 +303,23 @@ def append_sequence(df: pd.DataFrame) -> pd.DataFrame:
     return working_copy
 
 
-def filter_with_pisces(df: pd.DataFrame, seq_id: int, res: float) -> pd.DataFrame:
+def filter_with_pisces(df: pd.DataFrame, seq_id: int, res: float, pisces_location: str) -> pd.DataFrame:
     """Takes CATH datarame and makes it non-redundant based on PISCES dataset
 
     Parameters
     ----------
     df: pd.DataFrame
-        CATH DataFrame
+        CATH DataFrame.
     seq_id: int
-        Sequence identity cutoff
+        Sequence identity cutoff.
     res: float
         Resolution cutoff
+    pisces_location: str
+        Path to pisces directory.
 
     Returns
     -------
-    A non-redundant DataFrame
+    A non-redundant DataFrame.
 
     Raises
     ------
@@ -335,7 +342,7 @@ def filter_with_pisces(df: pd.DataFrame, seq_id: int, res: float) -> pd.DataFram
     path_to_pisces = [
         x
         for x in glob.glob(
-            "/home/shared/datasets/pisces/cullpdb_pc%i_res%.1f_*" % (seq_id, res)
+            pisces_location+"cullpdb_pc%i_res%.1f_*" % (seq_id, res)
         )
         if x[-5:] != "fasta"
     ][0]
@@ -438,44 +445,6 @@ def filter_with_user_list(df: pd.DataFrame, path: str)->pd.DataFrame:
     frame_copy["PDB+chain"] = frame_copy["PDB+chain"].str.upper()
     return df.loc[frame_copy["PDB+chain"].isin(filtr)]
 
-def most_likely_sequence(sequence: list) -> str:
-    """Generates consensus sequence from multiple predictions.
-    Unused at the moment."""
-
-    acids = {
-        0: "A",
-        1: "C",
-        2: "D",
-        3: "E",
-        4: "F",
-        5: "G",
-        6: "H",
-        7: "I",
-        8: "K",
-        9: "L",
-        10: "M",
-        11: "N",
-        12: "P",
-        13: "Q",
-        14: "R",
-        15: "S",
-        16: "T",
-        17: "W",
-        18: "Y",
-        19: "V",
-    }
-    seq = np.array(sequence)
-    probability_matrix = []
-    for x in range(20):
-        # rows represent amino acids, columns represent sequence.
-        probability_matrix.append(
-            [position.count(acids[x]) / len(position) for position in zip(*seq)]
-        )
-    probability_matrix = np.array(probability_matrix)
-    most_likely_sequence = [acids[x] for x in np.argmax(probability_matrix, axis=0)]
-    return "".join(most_likely_sequence)
-
-
 def lookup_blosum62(a: str, b: str) -> int:
     """Returns score from the matrix.
 
@@ -488,7 +457,7 @@ def lookup_blosum62(a: str, b: str) -> int:
 
     Returns
     --------
-    Score"""
+    1 if score positive, 0 if not"""
 
     blosum62 = {
         ("W", "F"): 1,
@@ -769,10 +738,15 @@ def lookup_blosum62(a: str, b: str) -> int:
         ("B", "B"): 4,
     }
     if (a, b) in blosum62.keys():
-        return blosum62[a, b]
+      if blosum62[a, b] > 0 :
+        return 1
+      else:
+        return 0
     else:
-        return blosum62[b, a]
-
+      if blosum62[b, a] > 0 :
+        return 1
+      else:
+        return 0
 
 def sequence_recovery(true_seq: str, predicted_seq: str) -> float:
     """Calculates sequence recovery.
@@ -885,9 +859,10 @@ def run_Evo2EF(path: str, pdb: str, chain: str, number_of_runs: str):
     -------
     Nothing."""
 
+    #evo.sh must be in the same directory as this file.
     p = subprocess.Popen(
         [
-            "/home/s1706179/project/sequence-recovery-benchmark/evo.sh",
+            os.path.dirname(os.path.realpath(__file__))+"/evo.sh",
             path,
             pdb,
             chain,
@@ -961,10 +936,6 @@ def load_predictions(df: pd.DataFrame) -> pd.DataFrame:
                     # assume that biological assembly is a multimer and hope for the best
                     if len(prediction[0]) % len(protein.sequence) == 0:
                         prediction = [x[0 : len(protein.sequence)] for x in prediction]
-                        print(
-                            "%s%s prediction is a multimer"
-                            % (protein.PDB, protein.chain)
-                        )
                         predicted_sequences.append(prediction)
                     else:
                         print(
