@@ -12,7 +12,6 @@ from pathlib import Path
 from sklearn import metrics
 from benchmark import config
 
-
 def read_data(CATH_file: str) -> pd.DataFrame:
     """If CATH .csv exists, loads the DataFrame. If CATH .txt exists, makes DataFrame and saves it.
 
@@ -24,10 +23,10 @@ def read_data(CATH_file: str) -> pd.DataFrame:
     Returns
     -------
     DataFrame containing CATH and PDB codes."""
-    path = Path(CATH_file)
-    # load .csv if exists, faster than reading .txt
-    if path.with_suffix(".csv").exists():
-        df = pd.read_csv(path.with_suffix(".csv"), index_col=0)
+    path=Path(CATH_file)
+    #load .csv if exists, faster than reading .txt
+    if path.with_suffix('.csv').exists():
+        df = pd.read_csv(path.with_suffix('.csv'), index_col=0)
         # start, stop needs to be str
         df["start"] = df["start"].apply(str)
         df["stop"] = df["stop"].apply(str)
@@ -73,9 +72,8 @@ def read_data(CATH_file: str) -> pd.DataFrame:
                 "stop",
             ],
         )
-        df.to_csv(path.with_suffix(".csv"))
+        df.to_csv(path.with_suffix('.csv'))
         return df
-
 
 def tag_dssp_data(assembly: ampal.Assembly):
     """Same as ampal.dssp.tag_dssp_data(), but fixed a bug with insertions. Tags each residue in ampal.Assembly with secondary structure.
@@ -87,28 +85,27 @@ def tag_dssp_data(assembly: ampal.Assembly):
 
     dssp_out = ampal.dssp.run_dssp(assembly.pdb, path=False)
     dssp_data = ampal.dssp.extract_all_ss_dssp(dssp_out, path=False)
-    for i, record in enumerate(dssp_data):
+    for i,record in enumerate(dssp_data):
         rnum, sstype, chid, _, phi, psi, sacc = record
-        # deal with insertions
-        if len(chid) > 1:
-            for i, res in enumerate(assembly[chid[1]]):
-                if res.insertion_code == chid[0] and assembly[chid[1]][i].tags == {}:
-                    assembly[chid[1]][i].tags["dssp_data"] = {
-                        "ss_definition": sstype,
-                        "solvent_accessibility": sacc,
-                        "phi": phi,
-                        "psi": psi,
+        #deal with insertions
+        if len(chid)>1:
+            for i,res in enumerate(assembly[chid[1]]):
+                if res.insertion_code==chid[0] and assembly[chid[1]][i].tags=={}:
+                    assembly[chid[1]][i].tags['dssp_data'] = {
+                    'ss_definition': sstype,
+                    'solvent_accessibility': sacc,
+                    'phi': phi,
+                    'psi': psi
                     }
                     break
-
+                
         else:
-            assembly[chid][str(rnum)].tags["dssp_data"] = {
-                "ss_definition": sstype,
-                "solvent_accessibility": sacc,
-                "phi": phi,
-                "psi": psi,
+            assembly[chid][str(rnum)].tags['dssp_data'] = {
+            'ss_definition': sstype,
+            'solvent_accessibility': sacc,
+            'phi': phi,
+            'psi': psi
             }
-
 
 def get_sequence(series: pd.Series) -> str:
     """Gets a sequence of from PDB file, CATH fragment indexes and secondary structure labels.
@@ -127,13 +124,13 @@ def get_sequence(series: pd.Series) -> str:
     Notes
     -----
     Unnatural amino acids are removed"""
-
-    path = config.PATH_TO_PDB / series.PDB[1:3] / f"pdb{series.PDB}.ent.gz"
-
+    
+    path=config.PATH_TO_PDB/series.PDB[1:3]/f"pdb{series.PDB}.ent.gz"
+            
     if path.exists():
-        with gzip.open(path, "rb") as protein:
+        with gzip.open(path,"rb") as protein:
             assembly = ampal.load_pdb(protein.read().decode(), path=False)
-
+            
             # convert pdb res id into sequence index,
             # some files have discontinuous residue ids so ampal.get_slice_from_res_id() does not work
             start = 0
@@ -167,17 +164,16 @@ def get_sequence(series: pd.Series) -> str:
         try:
             tag_dssp_data(assembly)
             dssp = "".join(
-                [x.tags["dssp_data"]["ss_definition"] for x in chain if x.id != "X"]
+            [x.tags['dssp_data']['ss_definition'] for x in chain if x.id != "X"]
             )
-        # dssp can fail on some broken residues(e.g., missing side chain)
+        #dssp can fail on some broken residues(e.g., missing side chain)     
         except KeyError:
-            dssp = np.NaN
+            dssp=np.NaN
         return filtered_sequence, dssp, new_start, new_stop
     # some pdbs are obsolete or broken, return np.NaN
     else:
         print(f"{series.PDB}.pdb is missing.")
         return np.NaN, np.NaN, np.NaN, np.NaN
-
 
 def get_pdbs(
     df: pd.DataFrame, cls: int, arch: int = 0, topo: int = 0, homologous_sf: int = 0
@@ -246,33 +242,6 @@ def append_sequence(df: pd.DataFrame) -> pd.DataFrame:
     working_copy.loc[:, "stop"] = working_copy["stop"].apply(int)
     return working_copy
 
-
-def filter_with_pisces(df: pd.DataFrame, path_to_pisces: str) -> pd.DataFrame:
-    """Takes CATH datarame and makes it non-redundant based on PISCES dataset
-
-    Parameters
-    ----------
-    df: pd.DataFrame
-        CATH DataFrame.
-    path_to_pisces: str
-        PISCES file location.
-
-    Returns
-    -------
-    A non-redundant DataFrame.
-    """
-
-    # check for wrong inputs
-    # make copy to prevent changes in original df
-    frame_copy = df.copy()
-    frame_copy["PDB+chain"] = df.PDB + df.chain
-    # must be upper letters for string comparison
-    frame_copy["PDB+chain"] = frame_copy["PDB+chain"].str.upper()
-    with open(path_to_pisces) as file:
-        pisces = [x.split()[0] for x in file.readlines()[1:]]
-    return df.loc[frame_copy["PDB+chain"].isin(pisces)]
-
-
 def filter_with_TS50(df: pd.DataFrame) -> pd.DataFrame:
     """Takes CATH datarame and returns PDB chains from TS50 dataset
 
@@ -294,11 +263,8 @@ def filter_with_TS50(df: pd.DataFrame) -> pd.DataFrame:
     # must be upper letters for string comparison
     frame_copy["PDB+chain"] = frame_copy["PDB+chain"].str.upper()
     return df.loc[frame_copy["PDB+chain"].isin(config.ts50)]
-
-
-def filter_with_user_list(
-    df: pd.DataFrame, path: str, ispisces: bool = False
-) -> pd.DataFrame:
+    
+def filter_with_user_list(df: pd.DataFrame, path: str, ispisces:bool = False)->pd.DataFrame:
     """Selects PDB chains specified in .txt file.
     Parameters
     ----------
@@ -308,24 +274,21 @@ def filter_with_user_list(
         Path to .txt file
     ispisces:bool = False
         Reads pisces formating if True, otherwise pdb+chain, e.g., 1a2bA\n.
-
+    
     Returns
     -------
     DataFrame with selected chains,duplicates are removed."""
-    path = Path(path)
+    path=Path(path)
     with open(path) as file:
         if ispisces:
             filtr = [x.split()[0] for x in file.readlines()[1:]]
         else:
-            filtr = [x.upper().strip("\n") for x in file.readlines()]
+            filtr=[x.upper().strip('\n') for x in file.readlines()]
     frame_copy = df.copy()
     frame_copy["PDB+chain"] = df.PDB + df.chain
     # must be upper letters for string comparison
     frame_copy["PDB+chain"] = frame_copy["PDB+chain"].str.upper()
-    return df.loc[frame_copy["PDB+chain"].isin(filtr)].drop_duplicates(
-        subset=["PDB", "chain"]
-    )
-
+    return df.loc[frame_copy["PDB+chain"].isin(filtr)].drop_duplicates(subset=['PDB','chain'])
 
 def lookup_blosum62(res_true: str, res_prediction: str) -> int:
     """Returns score from the matrix.
@@ -342,57 +305,9 @@ def lookup_blosum62(res_true: str, res_prediction: str) -> int:
     Score from the matrix."""
 
     if (res_true, res_prediction) in config.blosum62.keys():
-        return config.blosum62[res_true, res_prediction]
+      return config.blosum62[res_true, res_prediction] 
     else:
-        return config.blosum62[res_prediction, res_true]
-
-
-def sequence_recovery(true_seq: str, predicted_seq: str) -> float:
-    """Calculates sequence recovery.
-
-    Parameters
-    ----------
-    true_seq: str,
-        True sequence.
-    predicted_seq: str
-        Predicted sequence.
-
-    Returns
-    --------
-    Sequence recovery rate"""
-
-    correct = 0
-    for i, acid in enumerate(true_seq):
-        if acid == predicted_seq[i]:
-            correct = correct + 1
-    return correct / len(predicted_seq)
-
-
-def similarity_score(true_seq: str, predicted_seq: str) -> float:
-
-    """Calculates similar sequence recovery, amino acids of the same type (positive blosum62 score) are considered as correct predictions.
-
-    Parameters
-    ----------
-    true_seq: str,
-        True sequence.
-    predicted_seq: str
-        Predicted sequence.
-
-    Returns
-    --------
-    Similar sequence recovery rate
-
-    Reference
-    ---------
-    https://doi.org/10.1002/prot.25868 (ProDCoNN)"""
-
-    correct = 0
-    for i, acid in enumerate(true_seq):
-        if lookup_blosum62(acid, predicted_seq[i]) > 0:
-            correct = correct + 1
-    return correct / len(true_seq)
-
+      return config.blosum62[res_prediction, res_true]
 
 def secondary_score(true_seq: np.array, predicted_seq: np.array, dssp: str) -> list:
     """Calculates sequence recovery rate for each secondary structure type.
@@ -410,53 +325,54 @@ def secondary_score(true_seq: np.array, predicted_seq: np.array, dssp: str) -> l
     -------
     List with sequence recovery for helices, beta sheets, random coils and structured loops"""
 
-    alpha = 0
-    alpha_counter = 0
-    beta = 0
-    beta_counter = 0
-    random = 0
-    random_counter = 0
-    loop = 0
-    loop_counter = 0
+    alpha=0
+    alpha_counter=0
+    beta=0
+    beta_counter=0
+    random=0
+    random_counter=0
+    loop=0
+    loop_counter=0
 
-    for structure, result in zip(dssp, true_seq == predicted_seq):
-        if structure == "H" or structure == "I" or structure == "G":
-            alpha_counter += 1
+    for structure,result in zip(dssp,true_seq==predicted_seq):
+        if structure=="H" or structure=="I" or structure=="G":
+            alpha_counter+=1
             if result:
-                alpha += 1
-        if structure == "E":
-            beta_counter += 1
+                alpha+=1
+        if structure=='E':
+            beta_counter+=1
             if result:
-                beta += 1
-        if structure == "B" or structure == "T" or structure == "S":
-            loop_counter += 1
+                beta+=1
+        if structure=="B" or structure=="T" or structure=="S":
+            loop_counter+=1
             if result:
-                loop += 1
-        if structure == " ":
-            random_counter += 1
+                loop+=1
+        if structure==' ':
+            random_counter+=1
             if result:
-                random += 1
-
-    if alpha_counter != 0:
-        alpha = alpha / alpha_counter
+                random+=1
+            
+    if alpha_counter!=0:
+        alpha=alpha/alpha_counter
     else:
-        alpha = np.NaN
-
-    if beta_counter != 0:
-        beta = beta / beta_counter
+        alpha=np.NaN
+    
+    if beta_counter!=0:
+        beta=beta/beta_counter
     else:
-        beta = np.NaN
-
-    if loop_counter != 0:
-        loop = loop / loop_counter
+        beta=np.NaN
+    
+    if loop_counter!=0:
+        loop=loop/loop_counter
     else:
-        loop = np.NaN
-
-    if random_counter != 0:
-        random = random / random_counter
+        loop=np.NaN
+    
+    if random_counter!=0:
+        random=random/random_counter
     else:
-        random = np.NaN
-    return alpha, beta, loop, random
+        random=np.NaN
+    return alpha,beta,loop,random
+    
 
 
 def run_Evo2EF(pdb: str, chain: str, number_of_runs: str, working_dir: Path):
@@ -479,10 +395,10 @@ def run_Evo2EF(pdb: str, chain: str, number_of_runs: str, working_dir: Path):
     -------
     Nothing."""
 
-    # evo.sh must be in the same directory as this file.
+    #evo.sh must be in the same directory as this file.
     p = subprocess.Popen(
         [
-            os.path.dirname(os.path.realpath(__file__)) + "/evo.sh",
+            os.path.dirname(os.path.realpath(__file__))+"/evo.sh",
             pdb,
             chain,
             number_of_runs,
@@ -493,9 +409,7 @@ def run_Evo2EF(pdb: str, chain: str, number_of_runs: str, working_dir: Path):
     print(f"{pdb}{chain} done.")
 
 
-def multi_Evo2EF(
-    df: pd.DataFrame, number_of_runs: int, working_dir: str, max_processes: int = 8
-):
+def multi_Evo2EF(df: pd.DataFrame, number_of_runs: int, working_dir: str, max_processes: int = 8):
     """Runs Evo2EF on all PDB chains in the DataFrame.
 
     Parameters
@@ -508,7 +422,7 @@ def multi_Evo2EF(
         Number of cores to use, default is 8.
     working_dir: str
       Dir where to store temporary files and results.
-
+      
     Returns
     --------
     Nothing."""
@@ -517,77 +431,77 @@ def multi_Evo2EF(
     # remove duplicated chains
     df = df.drop_duplicates(subset=["PDB", "chain"])
 
-    # check if working directory exists. Make one if doesn't exist.
-    working_dir = Path(working_dir)
+    #check if working directory exists. Make one if doesn't exist.
+    working_dir=Path(working_dir)
     if not working_dir.exists():
-        os.makedirs(working_dir)
-    if not (working_dir / "results").exists():
-        os.makedirs(working_dir / "/results")
+      os.makedirs(working_dir)
+    if not (working_dir/'results').exists():
+      os.makedirs(working_dir/'/results')
 
     for i, protein in df.iterrows():
-        with gzip.open(
-            config.PATH_TO_ASSEMBLIES / protein.PDB[1:3] / f"{protein.PDB}.pdb1.gz"
-        ) as file:
+        with gzip.open(config.PATH_TO_ASSEMBLIES/protein.PDB[1:3]/f"{protein.PDB}.pdb1.gz") as file:
             assembly = ampal.load_pdb(file.read().decode(), path=False)
-            if isinstance(assembly, ampal.assembly.AmpalContainer):
-                assembly = assembly[0]
-        pdb_text = assembly.make_pdb(ligands=False)
-        # writing new pdb with AMPAL fixes most of the errors with EvoEF2
-        with open((working_dir / protein.PDB).with_suffix(".pdb1"), "w") as pdb_file:
+            if isinstance(assembly,ampal.assembly.AmpalContainer):
+                assembly=assembly[0]
+        pdb_text=assembly.make_pdb(ligands=False)
+        #writing new pdb with AMPAL fixes most of the errors with EvoEF2
+        with open((working_dir/protein.PDB).with_suffix(".pdb1"),'w') as pdb_file:
             pdb_file.write(pdb_text)
-        inputs.append((protein.PDB, protein.chain, str(number_of_runs), working_dir))
+        inputs.append((protein.PDB, protein.chain, str(number_of_runs),working_dir))
     with multiprocessing.Pool(max_processes) as P:
         P.starmap(run_Evo2EF, inputs)
 
 
-def load_predictions(df: pd.DataFrame, path: str) -> pd.DataFrame:
+def load_predictions(df: pd.DataFrame,path:str) -> pd.DataFrame:
     """Loads predicted sequences from .txt to CATH DataFrame, drops entries for which sequence prediction fails.
-    Parameters
-    ----------
-    df: pd.DataFrame
-        CATH dataframe
-    path:str
-        Path to prediction directory.
-
-    Returns
-    -------
-    DataFrame with appended prediction."""
+        Parameters
+        ----------
+        df: pd.DataFrame
+            CATH dataframe
+        path:str
+            Path to prediction directory.
+        
+        Returns
+        -------
+        DataFrame with appended prediction."""
 
     predicted_sequences = []
-    path = Path(path)
+    path=Path(path)
     for i, protein in df.iterrows():
-        prediction_path = path / f"{protein.PDB}{protein.chain}.txt"
+        prediction_path = path/f"{protein.PDB}{protein.chain}.txt"
         # check for empty and missing files
-        if prediction_path.exists() and os.path.getsize(prediction_path) > 0:
+        if prediction_path.exists() and os.path.getsize(prediction_path)>0:
             with open(prediction_path) as prediction:
                 seq = prediction.readline().split()[0]
-                if seq == "0":
+                if seq == '0':
                     print(
                         f"{protein.PDB}{protein.chain} prediction does not exits, EvoEF2 returned 0."
                     )
-                    seq = np.NaN
+                    seq=np.NaN
                 elif len(seq) != len(protein.sequence):
                     # assume that biological assembly is a multimer
                     if len(seq) % len(protein.sequence) == 0:
-                        seq = seq[0 : len(protein.sequence)]
+                        seq = seq[0 : len(protein.sequence)]    
                     else:
                         print(
                             f"{protein.PDB}{protein.chain} prediction and true sequence have different length."
                         )
-                        seq = np.NaN
+                        seq=np.NaN
         else:
             print(f"{protein.PDB}{protein.chain} prediction does not exits.")
-            seq = np.NaN
+            seq=np.NaN
         predicted_sequences.append(seq)
-    # avoid changing the original dataframe
-    df = df.copy()
+    #avoid changing the original dataframe
+    df=df.copy()
     df["predicted_sequences"] = predicted_sequences
     df.dropna(inplace=True)
     # drop empty lists
     return df
 
 
-def score(df: pd.DataFrame, by_fragment: bool = True) -> list:
+def score(
+    df: pd.DataFrame, by_fragment: bool =True
+) -> list:
     """Concatenates and scores all predicted sequences in the DataFrame.
 
     Parameters
@@ -601,76 +515,57 @@ def score(df: pd.DataFrame, by_fragment: bool = True) -> list:
     --------
     A list with sequence recovery, similarity, f1 and secondary structure scores"""
 
-    sequence = ""
-    prediction = ""
-    dssp = ""
-    for i, x in df.iterrows():
+    sequence=''
+    prediction=''
+    dssp=''
+    for i,x in df.iterrows():
         if by_fragment:
-            sequence += x.sequence[x.start : x.stop + 1]
-            prediction += x.predicted_sequences[x.start : x.stop + 1]
-            dssp += x.dssp[x.start : x.stop + 1]
+            sequence+=x.sequence[x.start:x.stop+1]
+            prediction+=x.predicted_sequences[x.start:x.stop+1]
+            dssp+=x.dssp[x.start:x.stop+1]
         else:
-            sequence += x.sequence
-            prediction += x.predicted_sequences
-            dssp += x.dssp
-    sequence = np.array(list(sequence))
-    prediction = np.array(list(prediction))
-    dssp = np.array(list(dssp))
-    # check if length match
-    assert len(sequence) == len(
-        prediction
-    ), "Sequence and predicted sequence lengths are not equal."
-    sequence_recovery = metrics.accuracy_score(sequence, prediction)
+            sequence+=x.sequence
+            prediction+=x.predicted_sequences
+            dssp+=x.dssp
+    sequence=np.array(list(sequence))
+    prediction=np.array(list(prediction))
+    dssp=np.array(list(dssp))
+    #check if length match
+    assert len(sequence)==len(prediction), 'Sequence and predicted sequence lengths are not equal.'
+    sequence_recovery=metrics.accuracy_score(sequence,prediction)
+    
+    f1=metrics.f1_score(sequence,prediction,average='macro')
+    
+    similarity_score=[1 if lookup_blosum62(a,b)>0 else 0 for a,b in zip(sequence,prediction)]
+    similarity_score=sum(similarity_score)/len(similarity_score)
+    
+    alpha,beta,loop,random=secondary_score(prediction,sequence,dssp)
+    
+    return sequence_recovery,similarity_score,f1,alpha,beta,loop,random
 
-    f1 = metrics.f1_score(sequence, prediction, average="macro")
-
-    similarity_score = [
-        1 if lookup_blosum62(a, b) > 0 else 0 for a, b in zip(sequence, prediction)
-    ]
-    similarity_score = sum(similarity_score) / len(similarity_score)
-
-    alpha, beta, loop, random = secondary_score(prediction, sequence, dssp)
-
-    return sequence_recovery, similarity_score, f1, alpha, beta, loop, random
-
-
-def score_by_architecture(df: pd.DataFrame, by_fragment: bool = True) -> pd.DataFrame:
+def score_by_architecture(df:pd.DataFrame,by_fragment: bool =True)->pd.DataFrame:
     """Groups the predictions by architecture and scores each separately.
 
-    Parameters
-    ----------
-    df:pd.DataFrame
-        DataFrame containing predictions, cath codes and true sequences.
-    by_fragment: bool =True
-        If true scores only CATH fragments, if False, scores entire chain.
+        Parameters
+        ----------
+        df:pd.DataFrame
+            DataFrame containing predictions, cath codes and true sequences.
+        by_fragment: bool =True
+            If true scores only CATH fragments, if False, scores entire chain.
+        
+        Returns
+        -------
+        DataFrame with accuracy, similarity, f1, and secondary structure accuracy."""
 
-    Returns
-    -------
-    DataFrame with accuracy, similarity, f1, and secondary structure accuracy."""
-
-    architectures = df.drop_duplicates(subset=["class", "architecture"])[
-        "architecture"
-    ].values
-    classes = df.drop_duplicates(subset=["class", "architecture"])["class"].values
-    scores = []
-    names = []
-    for cls, arch in zip(classes, architectures):
-        scores.append(score(get_pdbs(df, cls, arch)))
-        # lookup normal names
+    architectures=df.drop_duplicates(subset=['class','architecture'])['architecture'].values
+    classes=df.drop_duplicates(subset=['class','architecture'])['class'].values
+    scores=[]
+    names=[]
+    for cls,arch in zip(classes,architectures):
+        scores.append(score(get_pdbs(df,cls,arch)))
+        #lookup normal names
         names.append(config.architectures[f"{cls}.{arch}"])
-    score_frame = pd.DataFrame(
-        scores,
-        columns=[
-            "accuracy",
-            "similarity",
-            "f1",
-            "alpha",
-            "beta",
-            "struct_loops",
-            "random",
-        ],
-        index=[classes, architectures],
-    )
-    # get meaningful names
-    score_frame["name"] = names
+    score_frame=pd.DataFrame(scores,columns=['accuracy','similarity','f1','alpha','beta','struct_loops','random'],index=[classes,architectures]) 
+    #get meaningful names
+    score_frame['name']=names
     return score_frame
