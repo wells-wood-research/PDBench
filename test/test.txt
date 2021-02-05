@@ -236,27 +236,27 @@ SSEQS     RYDYCDILEC
 ENDSEG
 //
 FORMAT    CDDF1.0
-DOMAIN    1oaiA00
+DOMAIN    1a62A01
 VERSION   4.3.0
 VERDATE   11-Sep-2019
-NAME      Nuclear RNA export factor. Chain: a. Fragment: uba domain, residues 56
-NAME      1-619. Synonym: tap, tip associating protein, mRNA export factor tap. 
-NAME      Engineered: yes. Fxfg nucleoporin peptide. Chain: b. Fragment: nucleop
-NAME      orin peptide, residues 10-18. Engineered: yes
-SOURCE    Homo sapiens. Human. Organism_taxid: 9606.  Expressed in: escherichia 
-SOURCE    coli. Expression_system_taxid: 562.
-CATHCODE  1.10.8.10
+NAME      Rho. Chain: a. Fragment: RNA binding domain, residues 1 - 130. Enginee
+NAME      red: yes
+SOURCE    Escherichia coli bl21(de3). Organism_taxid: 469008. Strain: bl21 (de3)
+SOURCE    . Cell_line: bl21.  Expressed in: escherichia coli bl21(de3). Expressi
+SOURCE    on_system_taxid: 469008.
+CATHCODE  1.10.720.10
 CLASS     Mainly Alpha
 ARCH      Orthogonal Bundle
-TOPOL     Helicase, Ruva Protein; domain 3
-HOMOL     DNA helicase RuvA subunit, C-terminal domain
-DLENGTH   59
-DSEQH     >pdb|1oaiA00
-DSEQS     PTLSPEQQEMLQAFSTQSGMNLEWSQKCLQDNNWDYTRSAQAFTHLKAKGEIPEVAFMK
+TOPOL     Transcription Termination Factor Rho, Rna-binding Domain; Chain A, Domain 1
+HOMOL     Transcription Termination Factor Rho, Rna-binding Domain; Chain A, Domain 1
+DLENGTH   44
+DSEQH     >pdb|1a62A01
+DSEQS     NLTELKNTPVSELITLGENGLENLARRKQDIIFAILKQHAKSGE
 NSEGMENTS 1
-SEGMENT   1oaiA00:1:1
-SRANGE    START=561  STOP=619
-SLENGTH   59
-SSEQH     >pdb|1oaiA00:1:1
-SSEQS     PTLSPEQQEMLQAFSTQSGMNLEWSQKCLQDNNWDYTRSAQAFTHLKAKGEIPEVAFMK
+SEGMENT   1a62A01:1:1
+SRANGE    START=2  STOP=47
+SLENGTH   44
+SSEQH     >pdb|1a62A01:1:1
+SSEQS     NLTELKNTPVSELITLGENGLENLARRKQDIIFAILKQHAKSGE
 ENDSEG
+//
