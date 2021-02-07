@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 from sklearn import metrics
 from benchmark import config
+import string
 
 def read_data(CATH_file: str) -> pd.DataFrame:
     """If CATH .csv exists, loads the DataFrame. If CATH .txt exists, makes DataFrame and saves it.
@@ -125,12 +126,16 @@ def get_sequence(series: pd.Series) -> str:
     -----
     Unnatural amino acids are removed"""
     
-    path=config.PATH_TO_PDB/series.PDB[1:3]/f"pdb{series.PDB}.ent.gz"
+    #path=config.PATH_TO_PDB/series.PDB[1:3]/f"pdb{series.PDB}.ent.gz"
+    path=config.PATH_TO_ASSEMBLIES/series.PDB[1:3]/f"{series.PDB}.pdb1.gz"
             
     if path.exists():
         with gzip.open(path,"rb") as protein:
             assembly = ampal.load_pdb(protein.read().decode(), path=False)
-            
+            #check is assembly has multiple states, pick the first
+            if isinstance(assembly,ampal.assembly.AmpalContainer):
+                if assembly[0].id.count('_state_')>0:
+                    assembly=assembly[0]
             # convert pdb res id into sequence index,
             # some files have discontinuous residue ids so ampal.get_slice_from_res_id() does not work
             start = 0
@@ -138,7 +143,10 @@ def get_sequence(series: pd.Series) -> str:
             # if nmr structure, get 1st model
             if isinstance(assembly, ampal.AmpalContainer):
                 assembly = assembly[0]
-            chain = assembly[series.chain]
+            try:
+                chain = assembly[series.chain]
+            except KeyError:
+                return np.NaN, np.NaN, np.NaN, np.NaN
             for i, residue in enumerate(chain):
                 # deal with insertions
                 if series.start[-1].isalpha():
@@ -172,7 +180,7 @@ def get_sequence(series: pd.Series) -> str:
         return filtered_sequence, dssp, new_start, new_stop
     # some pdbs are obsolete or broken, return np.NaN
     else:
-        print(f"{series.PDB}.pdb is missing.")
+        print(f"{series.PDB}.pdb1 is missing.")
         return np.NaN, np.NaN, np.NaN, np.NaN
 
 def get_pdbs(
@@ -441,13 +449,25 @@ def multi_Evo2EF(df: pd.DataFrame, number_of_runs: int, working_dir: str, max_pr
     for i, protein in df.iterrows():
         with gzip.open(config.PATH_TO_ASSEMBLIES/protein.PDB[1:3]/f"{protein.PDB}.pdb1.gz") as file:
             assembly = ampal.load_pdb(file.read().decode(), path=False)
-            if isinstance(assembly,ampal.assembly.AmpalContainer):
-                assembly=assembly[0]
-        pdb_text=assembly.make_pdb(ligands=False)
-        #writing new pdb with AMPAL fixes most of the errors with EvoEF2
+        #fuse all states of the assembly into one state to avoid EvoEF2 errors.
+        empty_polymer=ampal.Assembly()
+        chain_id=[]
+        for polymer in assembly:
+            for chain in polymer:
+                empty_polymer.append(chain)
+                chain_id.append(chain.id)
+        #relabel chains to avoid repetition
+        str_list=string.ascii_uppercase.replace(protein.chain, "")
+        index=chain_id.index(protein.chain)
+        chain_id=list(str_list[:len(chain_id)])
+        chain_id[index]=protein.chain
+        empty_polymer.relabel_polymers(chain_id)
+        pdb_text=empty_polymer.make_pdb(alt_states=False,ligands=False)
+        #writing new pdb with AMPAL fixes most of the errors with EvoEF2.
         with open((working_dir/protein.PDB).with_suffix(".pdb1"),'w') as pdb_file:
             pdb_file.write(pdb_text)
         inputs.append((protein.PDB, protein.chain, str(number_of_runs),working_dir))
+
     with multiprocessing.Pool(max_processes) as P:
         P.starmap(run_Evo2EF, inputs)
 
@@ -500,7 +520,7 @@ def load_predictions(df: pd.DataFrame,path:str) -> pd.DataFrame:
 
 
 def score(
-    df: pd.DataFrame, by_fragment: bool =True
+    df: pd.DataFrame, by_fragment: bool=True
 ) -> list:
     """Concatenates and scores all predicted sequences in the DataFrame.
 
@@ -543,7 +563,7 @@ def score(
     
     return sequence_recovery,similarity_score,f1,alpha,beta,loop,random
 
-def score_by_architecture(df:pd.DataFrame,by_fragment: bool =True)->pd.DataFrame:
+def score_by_architecture(df:pd.DataFrame,by_fragment: bool=True)->pd.DataFrame:
     """Groups the predictions by architecture and scores each separately.
 
         Parameters
@@ -562,7 +582,7 @@ def score_by_architecture(df:pd.DataFrame,by_fragment: bool =True)->pd.DataFrame
     scores=[]
     names=[]
     for cls,arch in zip(classes,architectures):
-        scores.append(score(get_pdbs(df,cls,arch)))
+        scores.append(score(get_pdbs(df,cls,arch),by_fragment))
         #lookup normal names
         names.append(config.architectures[f"{cls}.{arch}"])
     score_frame=pd.DataFrame(scores,columns=['accuracy','similarity','f1','alpha','beta','struct_loops','random'],index=[classes,architectures]) 
