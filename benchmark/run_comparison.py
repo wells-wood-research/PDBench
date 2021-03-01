@@ -6,14 +6,15 @@ from pathlib import Path
 import click
 import os
 
-def check_sets(dataset:Path, training_set:Path):
+
+def check_sets(dataset: Path, training_set: Path):
     """Compares training and testing sets, warns if they overlap.
-        Parameters
-        ----------
-        dataset:Path
-            Path to .txt file with the dataset.
-        training_set:Path
-            Path to a file with the training set, can be PISCES, pdb code or pdb+chain.
+    Parameters
+    ----------
+    dataset:Path
+        Path to .txt file with the dataset.
+    training_set:Path
+        Path to a file with the training set, can be PISCES, pdb code or pdb+chain.
     """
 
     with open(training_set) as file:
@@ -21,7 +22,7 @@ def check_sets(dataset:Path, training_set:Path):
         # check for pisces
         if len(training_chains[0]) != 5:
             training_chains = training_chains[1:]
-    #check only pdb codes, not chains
+    # check only pdb codes, not chains
     with open(dataset) as file:
         testing_chains = [x.split()[0][:4].upper() for x in file.readlines()]
 
@@ -37,8 +38,10 @@ def check_sets(dataset:Path, training_set:Path):
         for chain in testing_chains:
             if chain not in repeated_chains:
                 print(chain)
-        if click.confirm('Model evaluation might not be valid. Do you want to continue?'):
-            click.echo('Continuing!')
+        if click.confirm(
+            "Model evaluation might not be valid. Do you want to continue?"
+        ):
+            click.echo("Continuing!")
         else:
             exit()
     else:
@@ -111,7 +114,6 @@ def check_sets(dataset:Path, training_set:Path):
     is_flag=True,
     help="Produces predicted and true Ramachandran plots for each model.",
 )
-
 def compare_models(
     dataset: str,
     path_to_pdb: str,
@@ -157,13 +159,15 @@ def compare_models(
     """
 
     by_fragment = not by_chain
-    #check training and testing sets
+    # check training and testing sets
     if training_set:
-        check_sets(Path(dataset),Path(training_set))
+        check_sets(Path(dataset), Path(training_set))
     else:
-        #Warn and ask for confirmation to continue.
-        if click.confirm('Cannot compare training and testing sets. Do you want to continue?'):
-            click.echo('Continuing!')
+        # Warn and ask for confirmation to continue.
+        if click.confirm(
+            "Cannot compare training and testing sets. Do you want to continue?"
+        ):
+            click.echo("Continuing!")
         else:
             exit
 
@@ -302,4 +306,3 @@ def compare_models(
         ignore_uncommon,
         by_fragment,
     )
-

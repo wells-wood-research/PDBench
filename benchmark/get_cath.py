@@ -18,7 +18,7 @@ from scipy.stats import entropy
 from benchmark import visualization
 from typing import Tuple, List, Iterable
 import warnings
-from sklearn.preprocessing import LabelBinarizer 
+from sklearn.preprocessing import LabelBinarizer
 
 
 def read_data(CATH_file: str) -> pd.DataFrame:
@@ -539,7 +539,9 @@ def load_prediction_sequence(df: pd.DataFrame, path: Path) -> dict:
                         f"EvoEF2: {protein.PDB}{protein.chain} prediction does not exits, EvoEF2 returned 0."
                     )
         else:
-            warnings.warn(f"EvoEF2: {protein.PDB}{protein.chain} prediction does not exits.")
+            warnings.warn(
+                f"EvoEF2: {protein.PDB}{protein.chain} prediction does not exits."
+            )
     return predicted_sequences
 
 
@@ -577,10 +579,10 @@ def load_prediction_matrix(
     filtered_empty_dict = {
         key: empty_dict[key] for key in empty_dict if len(empty_dict[key]) != 0
     }
-    #warn about missing predictions
-    missing_structures=[x for x in  empty_dict if x not in filtered_empty_dict]
-    if len(missing_structures)>0:
-        warnings.warn(f'ML models: {*missing_structures,} predictions are missing.')
+    # warn about missing predictions
+    missing_structures = [x for x in empty_dict if x not in filtered_empty_dict]
+    if len(missing_structures) > 0:
+        warnings.warn(f"ML models: {*missing_structures,} predictions are missing.")
     return filtered_empty_dict
 
 
@@ -643,8 +645,8 @@ def format_sequence(
     """
     sequence = ""
     dssp = ""
-    #Store failed structures
-    failed=[]
+    # Store failed structures
+    failed = []
     if score_sequence:
         prediction = ""
     else:
@@ -684,7 +686,7 @@ def format_sequence(
                 if len(predicted_sequence) % len(protein_sequence) == 0:
                     predicted_sequence = predicted_sequence[0 : len(protein_sequence)]
                 else:
-                    failed.append(protein.PDB+protein.chain)
+                    failed.append(protein.PDB + protein.chain)
                     continue
 
             if by_fragment:
@@ -704,10 +706,12 @@ def format_sequence(
                         [prediction, predicted_sequence], axis=0
                     )
             else:
-                failed.append(protein.PDB+protein.chain)
-    #Get all failed structures. 
-    if len(failed)>0:
-        raise ValueError(f"Sequence, predicted sequence and dssp length do not match for these structures: {*failed,}")
+                failed.append(protein.PDB + protein.chain)
+    # Get all failed structures.
+    if len(failed) > 0:
+        raise ValueError(
+            f"Sequence, predicted sequence and dssp length do not match for these structures: {*failed,}"
+        )
 
     sequence = np.array(list(sequence))
     dssp = np.array(list(dssp))
@@ -774,7 +778,7 @@ def score(
     recall = []
     similarity = []
     top_three = []
-    precision=[]
+    precision = []
 
     if score_sequence:
         prediction = np.array(list(prediction))
@@ -782,7 +786,11 @@ def score(
         recall.append(
             metrics.recall_score(sequence, prediction, average="macro", zero_division=0)
         )
-        precision.append(metrics.precision_score(sequence, prediction, average="macro", zero_division=0))
+        precision.append(
+            metrics.precision_score(
+                sequence, prediction, average="macro", zero_division=0
+            )
+        )
         similarity_score = [
             1 if lookup_blosum62(a, b) > 0 else 0 for a, b in zip(sequence, prediction)
         ]
@@ -794,7 +802,14 @@ def score(
                         true_secondary[seq_type], predicted_secondary[seq_type]
                     )
                 )
-                precision.append(metrics.precision_score(true_secondary[seq_type], predicted_secondary[seq_type], average="macro", zero_division=0))
+                precision.append(
+                    metrics.precision_score(
+                        true_secondary[seq_type],
+                        predicted_secondary[seq_type],
+                        average="macro",
+                        zero_division=0,
+                    )
+                )
                 recall.append(
                     metrics.recall_score(
                         true_secondary[seq_type],
@@ -825,7 +840,8 @@ def score(
                 sequence, most_likely_seq, average="macro", zero_division=0
             )
         )
-        precision.append(metrics.precision_score(
+        precision.append(
+            metrics.precision_score(
                 sequence, most_likely_seq, average="macro", zero_division=0
             )
         )
@@ -928,19 +944,21 @@ def score_by_architecture(
         if score_sequence:
             scores.append([accuracy[0], similarity[0], recall[0], precision[0]])
         else:
-            scores.append([accuracy[0], top_three[0], similarity[0], recall[0],precision[0]])
+            scores.append(
+                [accuracy[0], top_three[0], similarity[0], recall[0], precision[0]]
+            )
         # lookup normal names
         names.append(config.architectures[f"{cls}.{arch}"])
     if score_sequence:
         score_frame = pd.DataFrame(
             scores,
-            columns=["accuracy", "similarity", "recall","precision"],
+            columns=["accuracy", "similarity", "recall", "precision"],
             index=[classes, architectures],
         )
     else:
         score_frame = pd.DataFrame(
             scores,
-            columns=["accuracy", "top3_accuracy", "similarity", "recall","precision"],
+            columns=["accuracy", "top3_accuracy", "similarity", "recall", "precision"],
             index=[classes, architectures],
         )
     score_frame["name"] = names
@@ -1068,14 +1086,14 @@ def get_by_residue_metrics(
 
     if not issequence:
         entropy_arr = entropy(prediction, base=2, axis=1)
-        #calculate auc values
-        labels=LabelBinarizer().fit(config.acids).transform(sequence)
+        # calculate auc values
+        labels = LabelBinarizer().fit(config.acids).transform(sequence)
         roc_auc = []
         for i in range(len(config.acids)):
-            fpr, tpr, _ = metrics.roc_curve(labels[:, i],prediction[:, i])
+            fpr, tpr, _ = metrics.roc_curve(labels[:, i], prediction[:, i])
             roc_auc.append(metrics.auc(fpr, tpr))
         prediction = list(most_likely_sequence(prediction))
-        
+
     else:
         entropy_arr = np.empty(len(sequence))
         entropy_arr[:] = np.NaN

@@ -5,6 +5,7 @@ import click
 from benchmark.run_comparison import compare_models
 from benchmark.run_evoef2 import run_evoEF2
 
+
 @click.group()
 def cli():
     pass

@@ -99,6 +99,25 @@ def show_accuracy(
     ignore_uncommon: bool,
     score_sequence: bool,
 ) -> None:
+    """
+    Parameters
+    ----------
+    df: pd.DataFrame
+        CATH dataframe.
+    pdb: str
+      PDB code to visualize, format: pdb+CHAIN.
+    predictions: dict
+        Dictionary with predicted sequences, key is PDB+chain.
+    name: str
+        Location of the .pdf file, also title of the plot.
+    output: Path
+        Path to output directory.
+    path_to_pdbs: Path
+        Path to the directory with PDB files.
+    ignore_uncommon=True
+        If True, ignores uncommon residues in accuracy calculations.
+    score_sequence=False
+        True if dictionary contains sequences, False if probability matrices(matrix shape n,20)."""
     accuracy = []
     pdb_df = df[df.PDB == pdb]
     sequence, prediction, _, _, _ = get_cath.format_sequence(
@@ -322,7 +341,7 @@ def make_model_summary(
     score_sequence=False
         True if dictionary contains sequences, False if probability matrices(matrix shape n,20)."""
     
-    fig, ax = plt.subplots(ncols=5, nrows=5, figsize=(30, 30))
+    fig, ax = plt.subplots(ncols=5, nrows=5, figsize=(30, 40))
     #print version
     plt.figtext(0.1, 0.99,s='Version: '+version.__version__,figure=fig,fontdict={"size": 12})
     # show residue distribution and confusion matrix
@@ -599,9 +618,12 @@ def make_model_summary(
     # show per residue metrics about the model
     gs = ax[0, 0].get_gridspec()
     # show per residue entropy
-    ax[2][0].bar(by_residue_frame.index, by_residue_frame.entropy)
-    ax[2][0].set_ylabel("Entropy")
-    ax[2][0].set_xlabel("Amino acids")
+    if not score_sequence:
+        ax[2][0].bar(by_residue_frame.index, by_residue_frame.entropy)
+        ax[2][0].set_ylabel("Entropy")
+        ax[2][0].set_xlabel("Amino acids")
+    else:
+        ax[2][0].remove()
 
     # make one big subplot
     for a in ax[2, 1:]:
@@ -637,6 +659,12 @@ def make_model_summary(
         ax[1][0].bar(by_residue_frame.index, by_residue_frame.auc)
         ax[1][0].set_ylabel("AUC")
         ax[1][0].set_xlabel("Amino acids")
+    else:
+        ax[1][0].remove()
+    #Remove empty subplots.
+    ax[1][1].remove()
+    ax[1][2].remove()
+
 
 
     plt.suptitle(name, fontsize="xx-large")
