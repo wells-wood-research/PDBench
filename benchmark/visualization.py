@@ -15,7 +15,7 @@ from sklearn import metrics
 import matplotlib.backends.backend_pdf
 from scipy.stats import entropy
 from typing import List
-
+from benchmark import version
 
 def _annotate_ampalobj_with_data_tag(
     ampal_structure,
@@ -159,6 +159,7 @@ def ramachandran_plot(
         Name and location of the figure."""
 
     fig, ax = plt.subplots(20, 3, figsize=(15, 100))
+    plt.figtext(0.1, 0.99,s='Version: '+version.__version__,figure=fig,fontdict={"size": 12})
     # get angles for each amino acids
     for k, amino_acid in enumerate(config.acids):
         predicted_angles = [
@@ -320,8 +321,10 @@ def make_model_summary(
         If True, ignores uncommon residues in accuracy calculations.
     score_sequence=False
         True if dictionary contains sequences, False if probability matrices(matrix shape n,20)."""
-
-    fig, ax = plt.subplots(ncols=5, nrows=4, figsize=(30, 30))
+    
+    fig, ax = plt.subplots(ncols=5, nrows=5, figsize=(30, 30))
+    #print version
+    plt.figtext(0.1, 0.99,s='Version: '+version.__version__,figure=fig,fontdict={"size": 12})
     # show residue distribution and confusion matrix
     (
         sequence,
@@ -354,15 +357,15 @@ def make_model_summary(
     index = np.arange(len(seq[0]))
     # calculate prediction bias
     residue_bias = pred[1] / sum(pred[1]) - seq[1] / sum(seq[1])
-    ax[2][4].bar(x=index, height=residue_bias, width=0.8, align="center")
-    ax[2][4].set_ylabel("Prediction bias")
-    ax[2][4].set_xlabel("Amino acids")
+    ax[3][4].bar(x=index, height=residue_bias, width=0.8, align="center")
+    ax[3][4].set_ylabel("Prediction bias")
+    ax[3][4].set_xlabel("Amino acids")
     for e, dif in enumerate(residue_bias):
         if dif < 0:
             y_coord = 0
         else:
             y_coord = dif
-        ax[2][4].text(
+        ax[3][4].text(
             index[e],
             y_coord + 0.03,
             f"{dif:.3f}",
@@ -371,29 +374,29 @@ def make_model_summary(
             rotation="vertical",
         )
 
-    ax[2][4].set_xticks(index)
-    ax[2][4].set_xticklabels(
+    ax[3][4].set_xticks(index)
+    ax[3][4].set_xticklabels(
         pred[0], fontdict={"horizontalalignment": "center", "size": 12}
     )
-    ax[2][4].set_ylabel("Prediction bias")
-    ax[2][4].set_xlabel("Amino acids")
-    ax[2][4].set_title("All structures")
-    ax[2][4].set_ylim(top=1.0)
+    ax[3][4].set_ylabel("Prediction bias")
+    ax[3][4].set_xlabel("Amino acids")
+    ax[3][4].set_title("All structures")
+    ax[3][4].set_ylim(top=1.0)
 
     cm = metrics.confusion_matrix(sequence, prediction, labels=seq[0])
     cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
 
-    im = ax[3][4].imshow(cm, vmin=0, vmax=1)
-    ax[3][4].set_xlabel("Predicted")
-    ax[3][4].set_xticks(range(20))
-    ax[3][4].set_xticklabels(config.acids)
-    ax[3][4].set_ylabel("True")
-    ax[3][4].set_yticks(range(20))
-    ax[3][4].set_yticklabels(config.acids)
+    im = ax[4][4].imshow(cm, vmin=0, vmax=1)
+    ax[4][4].set_xlabel("Predicted")
+    ax[4][4].set_xticks(range(20))
+    ax[4][4].set_xticklabels(config.acids)
+    ax[4][4].set_ylabel("True")
+    ax[4][4].set_yticks(range(20))
+    ax[4][4].set_yticklabels(config.acids)
     # Plot Color Bar:
-    fig.colorbar(im, ax=ax[3][4], fraction=0.046)
+    fig.colorbar(im, ax=ax[4][4], fraction=0.046)
 
-    # plot confusion matrix for each secondary structrue type.
+    # plot prediction bias
     ss_names = ["Helices", "Sheets", "Structured loops", "Random"]
     for i, ss in enumerate(ss_names):
         seq = append_zero_residues(np.unique(true_secondary[i], return_counts=True))
@@ -401,21 +404,21 @@ def make_model_summary(
             np.unique(prediction_secondary[i], return_counts=True)
         )
         residue_bias = pred[1] / sum(pred[1]) - seq[1] / sum(seq[1])
-        ax[2][i].bar(x=index, height=residue_bias, width=0.8, align="center")
-        ax[2][i].set_xticks(index)
-        ax[2][i].set_xticklabels(
+        ax[3][i].bar(x=index, height=residue_bias, width=0.8, align="center")
+        ax[3][i].set_xticks(index)
+        ax[3][i].set_xticklabels(
             pred[0], fontdict={"horizontalalignment": "center", "size": 12}
         )
-        ax[2][i].set_ylabel("Prediction bias")
-        ax[2][i].set_xlabel("Amino acids")
-        ax[2][i].set_title(ss)
-        ax[2][i].set_ylim(top=1.0)
+        ax[3][i].set_ylabel("Prediction bias")
+        ax[3][i].set_xlabel("Amino acids")
+        ax[3][i].set_title(ss)
+        ax[3][i].set_ylim(top=1.0)
         for e, dif in enumerate(residue_bias):
             if dif < 0:
                 y_coord = 0
             else:
                 y_coord = dif
-            ax[2][i].text(
+            ax[3][i].text(
                 index[e],
                 y_coord + 0.03,
                 f"{dif:.3f}",
@@ -423,35 +426,38 @@ def make_model_summary(
                 va="bottom",
                 rotation="vertical",
             )
-
+        #plot confusion matrix
         cm = metrics.confusion_matrix(
             true_secondary[i], prediction_secondary[i], labels=seq[0]
         )
         cm = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
-        im = ax[3][i].imshow(cm, vmin=0, vmax=1)
-        ax[3][i].set_xlabel("Predicted")
-        ax[3][i].set_xticks(range(20))
-        ax[3][i].set_xticklabels(config.acids)
-        ax[3][i].set_ylabel("True")
-        ax[3][i].set_yticks(range(20))
-        ax[3][i].set_yticklabels(config.acids)
+        im = ax[4][i].imshow(cm, vmin=0, vmax=1)
+        ax[4][i].set_xlabel("Predicted")
+        ax[4][i].set_xticks(range(20))
+        ax[4][i].set_xticklabels(config.acids)
+        ax[4][i].set_ylabel("True")
+        ax[4][i].set_yticks(range(20))
+        ax[4][i].set_yticklabels(config.acids)
         # Plot Color Bar:
-        fig.colorbar(im, ax=ax[3][i], fraction=0.046)
+        fig.colorbar(im, ax=ax[4][i], fraction=0.046)
 
-    # show accuracy,recall and top3
+    # show accuracy,recall,similarity, precision and top3
     index = np.array([0, 1, 2, 3, 4])
-    # show accuracy
-    accuracy, top_three, similarity, recall = get_cath.score(
+    
+    accuracy, top_three, similarity, recall, precision = get_cath.score(
         df, predictions, by_fragment, ignore_uncommon, score_sequence
     )
+    # show accuracy
     ax[0][0].bar(x=index, height=accuracy, width=0.8, align="center")
 
     # show top three accuracy
     if not score_sequence:
         ax[0][0].scatter(x=index, y=top_three, marker="_", s=50, color="blue")
         ax[0][0].vlines(x=index, ymin=0, ymax=top_three, linewidth=2)
-        # show recall
+    # show recall
     ax[0][1].bar(x=index, height=recall, width=0.8, align="center")
+    ax[0][3].bar(x=index, height=precision, width=0.8, align="center")
+    ax[0][4].bar(x=index, height=similarity, width=0.8, align="center")
     # add values to the plot
     for e, value in enumerate(accuracy):
         ax[0][0].text(
@@ -464,6 +470,24 @@ def make_model_summary(
         )
     for e, value in enumerate(recall):
         ax[0][1].text(
+            index[e],
+            value * 1.2,
+            f"{value:.3f}",
+            ha="center",
+            va="bottom",
+            rotation="vertical",
+        )
+    for e, value in enumerate(precision):
+        ax[0][3].text(
+            index[e],
+            value * 1.2,
+            f"{value:.3f}",
+            ha="center",
+            va="bottom",
+            rotation="vertical",
+        )
+    for e, value in enumerate(similarity):
+        ax[0][4].text(
             index[e],
             value * 1.2,
             f"{value:.3f}",
@@ -522,6 +546,26 @@ def make_model_summary(
     ax[0][2].axhline(0, -0.3, index[-1] + 1, color="k", lw=1)
     ax[0][2].set_ylim(minimum * 1.2, maximum * 1.2)
 
+    ax[0][3].set_ylabel("Average precision")
+    ax[0][3].set_xticks(index)
+    ax[0][3].set_xticklabels(
+        ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
+        rotation=90,
+        fontdict={"horizontalalignment": "center", "size": 12},
+    )
+    ax[0][3].set_ylim(0, 1)
+    ax[0][3].set_xlim(-0.7, index[-1] + 1)
+
+    ax[0][4].set_ylabel("Similarity")
+    ax[0][4].set_xticks(index)
+    ax[0][4].set_xticklabels(
+        ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
+        rotation=90,
+        fontdict={"horizontalalignment": "center", "size": 12},
+    )
+    ax[0][4].set_ylim(0, 1)
+    ax[0][4].set_xlim(-0.7, index[-1] + 1)
+
     colors = sns.color_palette("viridis", 4)
     # combine classes 4 and 6 to simplify the graph
     colors = {1: colors[0], 2: colors[1], 3: colors[2], 4: colors[3], 6: colors[3]}
@@ -537,32 +581,32 @@ def make_model_summary(
     resolution = get_cath.get_resolution(df, path_to_pdb)
     # calculate Pearson correlation between accuracy/recall and resolution.
     corr = pd.DataFrame({0: resolution, 1: recall, 2: accuracy}).corr().to_numpy()
-    ax[0][3].scatter(resolution, accuracy, color=class_color, alpha=0.7)
+    ax[1][3].scatter(resolution, accuracy, color=class_color, alpha=0.7)
     # Title, label, ticks and limits
-    ax[0][3].set_xlabel("Resolution, A")
-    ax[0][3].set_ylabel("Accuracy")
-    ax[0][3].set_title(f"Pearson correlation: {corr[0][2]:.3f}")
-    ax[0][4].scatter(resolution, recall, color=class_color, alpha=0.7)
-    ax[0][4].set_title(f"Pearson correlation: {corr[0][1]:.3f}")
-    ax[0][4].set_ylabel("Average recall")
-    ax[0][4].set_xlabel("Resolution, A")
+    ax[1][3].set_xlabel("Resolution, A")
+    ax[1][3].set_ylabel("Accuracy")
+    ax[1][3].set_title(f"Pearson correlation: {corr[0][2]:.3f}")
+    ax[1][4].scatter(resolution, recall, color=class_color, alpha=0.7)
+    ax[1][4].set_title(f"Pearson correlation: {corr[0][1]:.3f}")
+    ax[1][4].set_ylabel("Average recall")
+    ax[1][4].set_xlabel("Resolution, A")
     # make a legend
     patches = [
         mpatches.Patch(color=colors[x], label=config.classes[x]) for x in config.classes
     ]
-    ax[0][4].legend(loc=1, handles=patches, prop={"size": 9})
-    ax[0][3].legend(loc=1, handles=patches, prop={"size": 9})
+    ax[1][4].legend(loc=1, handles=patches, prop={"size": 9})
+    ax[1][3].legend(loc=1, handles=patches, prop={"size": 9})
     # show per residue metrics about the model
     gs = ax[0, 0].get_gridspec()
     # show per residue entropy
-    ax[1][0].bar(by_residue_frame.index, by_residue_frame.entropy)
-    ax[1][0].set_ylabel("Entropy")
-    ax[1][0].set_xlabel("Amino acids")
+    ax[2][0].bar(by_residue_frame.index, by_residue_frame.entropy)
+    ax[2][0].set_ylabel("Entropy")
+    ax[2][0].set_xlabel("Amino acids")
 
     # make one big subplot
-    for a in ax[1, 1:]:
+    for a in ax[2, 1:]:
         a.remove()
-    ax_right = fig.add_subplot(gs[1, 1:])
+    ax_right = fig.add_subplot(gs[2, 1:])
     index = np.arange(len(by_residue_frame.index))
     # show recall,precision and f1
     for i, metric in enumerate(["recall", "precision", "f1"]):
@@ -586,6 +630,14 @@ def make_model_summary(
     )
     ax_right.set_xlim(index[0] - 0.3, index[-1] + 1)
     ax_right.set_ylim(0, 1)
+
+    #show auc values
+    if not score_sequence:
+         # show AUC
+        ax[1][0].bar(by_residue_frame.index, by_residue_frame.auc)
+        ax[1][0].set_ylabel("AUC")
+        ax[1][0].set_xlabel("Amino acids")
+
 
     plt.suptitle(name, fontsize="xx-large")
     fig.tight_layout(rect=[0, 0.03, 1, 0.98])
@@ -662,6 +714,8 @@ def compare_model_accuracy(
         gridspec_kw={"width_ratios": ratios},
         squeeze=False,
     )
+    plt.figtext(0.1, 0.99,s='Version: '+version.__version__,figure=fig,fontdict={"size": 12})
+
     for i in range(len(class_key)):
         index = np.arange(0, models[0].loc[class_key[i]].shape[0])
         for j, frame in enumerate(models):
@@ -827,11 +881,11 @@ def compare_model_accuracy(
     index = np.array([0, 1, 2, 3, 4])
     for j, model in enumerate(model_scores):
         if model_labels[j] != "EvoEF2":
-            accuracy, top_three, similarity, recall = get_cath.score(
+            accuracy, top_three, similarity, recall, precision = get_cath.score(
                 df, model, by_fragment, ignore_uncommon
             )
         else:
-            accuracy, top_three, similarity, recall = get_cath.score(
+            accuracy, top_three, similarity, recall, precision = get_cath.score(
                 df,
                 model,
                 by_fragment,

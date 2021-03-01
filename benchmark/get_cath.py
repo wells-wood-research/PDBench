@@ -18,6 +18,7 @@ from scipy.stats import entropy
 from benchmark import visualization
 from typing import Tuple, List, Iterable
 import warnings
+from sklearn.preprocessing import LabelBinarizer 
 
 
 def read_data(CATH_file: str) -> pd.DataFrame:
@@ -738,7 +739,7 @@ def score(
     by_fragment: bool = True,
     ignore_uncommon=False,
     score_sequence=False,
-) -> Tuple[List[float], List[float], List[float], List[float]]:
+) -> Tuple[List[float], List[float], List[float], List[float], List[float]]:
     """Concatenates and scores all predicted sequences in the DataFrame.
 
     Parameters
@@ -763,7 +764,9 @@ def score(
     similarity: List[float]
         List with similarity scores.
     recall: List[float]
-        List with macro average recall."""
+        List with macro average recall.
+    precision: List[float]
+        List with macro average precision."""
     sequence, prediction, dssp, true_secondary, predicted_secondary = format_sequence(
         df, predictions, by_fragment, ignore_uncommon, score_sequence
     )
@@ -771,6 +774,7 @@ def score(
     recall = []
     similarity = []
     top_three = []
+    precision=[]
 
     if score_sequence:
         prediction = np.array(list(prediction))
@@ -778,6 +782,7 @@ def score(
         recall.append(
             metrics.recall_score(sequence, prediction, average="macro", zero_division=0)
         )
+        precision.append(metrics.precision_score(sequence, prediction, average="macro", zero_division=0))
         similarity_score = [
             1 if lookup_blosum62(a, b) > 0 else 0 for a, b in zip(sequence, prediction)
         ]
@@ -789,6 +794,7 @@ def score(
                         true_secondary[seq_type], predicted_secondary[seq_type]
                     )
                 )
+                precision.append(metrics.precision_score(true_secondary[seq_type], predicted_secondary[seq_type], average="macro", zero_division=0))
                 recall.append(
                     metrics.recall_score(
                         true_secondary[seq_type],
@@ -809,12 +815,17 @@ def score(
                 accuracy.append(0)
                 recall.append(0)
                 similarity.append(0)
+                precision.append(0)
 
     else:
         most_likely_seq = list(most_likely_sequence(prediction))
         accuracy.append(metrics.accuracy_score(sequence, most_likely_seq))
         recall.append(
             metrics.recall_score(
+                sequence, most_likely_seq, average="macro", zero_division=0
+            )
+        )
+        precision.append(metrics.precision_score(
                 sequence, most_likely_seq, average="macro", zero_division=0
             )
         )
@@ -843,6 +854,14 @@ def score(
                         zero_division=0,
                     )
                 )
+                precision.append(
+                    metrics.precision_score(
+                        true_secondary[seq_type],
+                        secondary_sequence,
+                        average="macro",
+                        zero_division=0,
+                    )
+                )
                 similarity_score = [
                     1 if lookup_blosum62(a, b) > 0 else 0
                     for a, b in zip(true_secondary[seq_type], secondary_sequence)
@@ -862,7 +881,8 @@ def score(
                 top_three.append(0)
                 similarity.append(0)
                 recall.append(0)
-    return accuracy, top_three, similarity, recall
+                precision.append(0)
+    return accuracy, top_three, similarity, recall, precision
 
 
 def score_by_architecture(
@@ -889,7 +909,7 @@ def score_by_architecture(
 
     Returns
     -------
-    DataFrame with accuracy, similarity, and recall for each architecture type."""
+    DataFrame with accuracy, similarity, recall and precision for each architecture type."""
 
     architectures = df.drop_duplicates(subset=["class", "architecture"])[
         "architecture"
@@ -898,7 +918,7 @@ def score_by_architecture(
     scores = []
     names = []
     for cls, arch in zip(classes, architectures):
-        accuracy, top_three, similarity, recall = score(
+        accuracy, top_three, similarity, recall, precision = score(
             get_pdbs(df, cls, arch),
             predictions,
             by_fragment,
@@ -906,21 +926,21 @@ def score_by_architecture(
             score_sequence,
         )
         if score_sequence:
-            scores.append([accuracy[0], similarity[0], recall[0]])
+            scores.append([accuracy[0], similarity[0], recall[0], precision[0]])
         else:
-            scores.append([accuracy[0], top_three[0], similarity[0], recall[0]])
+            scores.append([accuracy[0], top_three[0], similarity[0], recall[0],precision[0]])
         # lookup normal names
         names.append(config.architectures[f"{cls}.{arch}"])
     if score_sequence:
         score_frame = pd.DataFrame(
             scores,
-            columns=["accuracy", "similarity", "recall"],
+            columns=["accuracy", "similarity", "recall","precision"],
             index=[classes, architectures],
         )
     else:
         score_frame = pd.DataFrame(
             scores,
-            columns=["accuracy", "top3_accuracy", "similarity", "recall"],
+            columns=["accuracy", "top3_accuracy", "similarity", "recall","precision"],
             index=[classes, architectures],
         )
     score_frame["name"] = names
@@ -1043,12 +1063,19 @@ def get_by_residue_metrics(
     Returns
     -------
     entropy_frame:pd.DataFrame
-        DataFrame with recall, precision, f1 score and entropy for each amino acids.
+        DataFrame with recall, precision, f1 score, entropy and AUC for each amino acids.
     """
 
     if not issequence:
         entropy_arr = entropy(prediction, base=2, axis=1)
+        #calculate auc values
+        labels=LabelBinarizer().fit(config.acids).transform(sequence)
+        roc_auc = []
+        for i in range(len(config.acids)):
+            fpr, tpr, _ = metrics.roc_curve(labels[:, i],prediction[:, i])
+            roc_auc.append(metrics.auc(fpr, tpr))
         prediction = list(most_likely_sequence(prediction))
+        
     else:
         entropy_arr = np.empty(len(sequence))
         entropy_arr[:] = np.NaN
@@ -1064,6 +1091,8 @@ def get_by_residue_metrics(
     entropy_frame.loc[:, "recall"] = rec
     entropy_frame.loc[:, "precision"] = prec
     entropy_frame.loc[:, "f1"] = f1
+    if not issequence:
+        entropy_frame.loc[:, "auc"] = roc_auc
     return entropy_frame
 
 
