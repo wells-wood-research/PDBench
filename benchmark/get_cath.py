@@ -17,6 +17,7 @@ import re
 from scipy.stats import entropy
 from benchmark import visualization
 from typing import Tuple, List, Iterable
+import warnings
 
 
 def read_data(CATH_file: str) -> pd.DataFrame:
@@ -533,11 +534,11 @@ def load_prediction_sequence(df: pd.DataFrame, path: Path) -> dict:
                 if seq != "0":
                     predicted_sequences[protein.PDB + protein.chain] = seq
                 else:
-                    print(
-                        f"{protein.PDB}{protein.chain} prediction does not exits, EvoEF2 returned 0."
+                    warnings.warn(
+                        f"EvoEF2: {protein.PDB}{protein.chain} prediction does not exits, EvoEF2 returned 0."
                     )
         else:
-            print(f"{protein.PDB}{protein.chain} prediction does not exits.")
+            warnings.warn(f"EvoEF2: {protein.PDB}{protein.chain} prediction does not exits.")
     return predicted_sequences
 
 
@@ -572,10 +573,14 @@ def load_prediction_matrix(
     for protein in empty_dict:
         empty_dict[protein] = np.array([x[1] for x in sorted(empty_dict[protein])])
     # drop keys with missing values
-    empty_dict = {
+    filtered_empty_dict = {
         key: empty_dict[key] for key in empty_dict if len(empty_dict[key]) != 0
     }
-    return empty_dict
+    #warn about missing predictions
+    missing_structures=[x for x in  empty_dict if x not in filtered_empty_dict]
+    if len(missing_structures)>0:
+        warnings.warn(f'ML models: {*missing_structures,} predictions are missing.')
+    return filtered_empty_dict
 
 
 def most_likely_sequence(probability_matrix: np.array) -> str:
@@ -637,6 +642,8 @@ def format_sequence(
     """
     sequence = ""
     dssp = ""
+    #Store failed structures
+    failed=[]
     if score_sequence:
         prediction = ""
     else:
@@ -676,9 +683,7 @@ def format_sequence(
                 if len(predicted_sequence) % len(protein_sequence) == 0:
                     predicted_sequence = predicted_sequence[0 : len(protein_sequence)]
                 else:
-                    print(
-                        f"{protein.PDB}{protein.chain} sequence, predicted sequence and dssp length do not match, this structure will be ignored."
-                    )
+                    failed.append(protein.PDB+protein.chain)
                     continue
 
             if by_fragment:
@@ -698,9 +703,10 @@ def format_sequence(
                         [prediction, predicted_sequence], axis=0
                     )
             else:
-                print(
-                    f"{protein.PDB}{protein.chain} sequence, predicted sequence and dssp length do not match, this structure will be ignored."
-                )
+                failed.append(protein.PDB+protein.chain)
+    #Get all failed structures. 
+    if len(failed)>0:
+        raise ValueError(f"Sequence, predicted sequence and dssp length do not match for these structures: {*failed,}")
 
     sequence = np.array(list(sequence))
     dssp = np.array(list(dssp))

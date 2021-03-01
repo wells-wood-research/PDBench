@@ -982,3 +982,4 @@ def compare_model_accuracy(
     pdf.savefig(fig_secondary)
     pdf.close()
     plt.close()
+    
