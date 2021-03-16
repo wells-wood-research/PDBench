@@ -97,7 +97,6 @@ def show_accuracy(
     output: Path,
     path_to_pdbs: Path,
     ignore_uncommon: bool,
-    score_sequence: bool,
 ) -> None:
     """
     Parameters
@@ -121,11 +120,11 @@ def show_accuracy(
     accuracy = []
     pdb_df = df[df.PDB == pdb]
     sequence, prediction, _, _, _ = get_cath.format_sequence(
-        pdb_df, predictions, False, ignore_uncommon, score_sequence
+        pdb_df, predictions, False, ignore_uncommon,
     )
-    if not score_sequence:
-        entropy_arr = entropy(prediction, base=2, axis=1)
-        prediction = list(get_cath.most_likely_sequence(prediction))
+    
+    entropy_arr = entropy(prediction, base=2, axis=1)
+    prediction = list(get_cath.most_likely_sequence(prediction))
     for resa, resb in zip(sequence, prediction):
         """correct predictions are given constant score so they stand out in the figure.
         e.g., spectrum b, blue_white_red, maximum=6,minimum=-6 gives nice plots. Bright red shows correct predictions
@@ -150,14 +149,10 @@ def show_accuracy(
         assembly = assembly[0]
     # select correct chain
     assembly = assembly[pdb_df.chain.values[0]]
-    if not score_sequence:
-        curr_annotated_structure = _annotate_ampalobj_with_data_tag(
-            assembly, [accuracy, entropy_arr], tags=["bfactor", "occupancy"]
-        )
-    else:
-        curr_annotated_structure = _annotate_ampalobj_with_data_tag(
-            assembly, [accuracy], tags=["bfactor"]
-        )
+    
+    curr_annotated_structure = _annotate_ampalobj_with_data_tag(
+        assembly, [accuracy, entropy_arr], tags=["bfactor", "occupancy"]
+    )
     with open(output, "w") as f:
         f.write(curr_annotated_structure.pdb)
 
@@ -316,9 +311,7 @@ def make_model_summary(
     predictions: dict,
     name: str,
     path_to_pdb: Path,
-    by_fragment: bool = True,
     ignore_uncommon: bool = False,
-    score_sequence: bool = False,
 ) -> None:
     """
     Makes a .pdf report whith model metrics.
@@ -334,12 +327,9 @@ def make_model_summary(
         Location of the .pdf file, also title of the plot.
     path_to_pdb: Path
         Path to the directory with PDB files.
-    by_fragment: bool
-        If true scores only CATH fragments, if False, scores entire chain.
     ignore_uncommon=True
         If True, ignores uncommon residues in accuracy calculations.
-    score_sequence=False
-        True if dictionary contains sequences, False if probability matrices(matrix shape n,20)."""
+    """
     
     fig, ax = plt.subplots(ncols=5, nrows=5, figsize=(30, 40))
     #print version
@@ -355,20 +345,18 @@ def make_model_summary(
         df,
         predictions,
         ignore_uncommon=ignore_uncommon,
-        score_sequence=score_sequence,
-        by_fragment=by_fragment,
+        by_fragment=False,
     )
     # get info about each residue
     by_residue_frame = get_cath.get_by_residue_metrics(
-        sequence, prediction, score_sequence
+        sequence, prediction
     )
     # convert probability array into list of characters.
-    if not score_sequence:
-        prediction = list(get_cath.most_likely_sequence(prediction))
-        prediction_secondary = [
-            list(get_cath.most_likely_sequence(ss_seq))
-            for ss_seq in prediction_secondary
-        ]
+    prediction = list(get_cath.most_likely_sequence(prediction))
+    prediction_secondary = [
+        list(get_cath.most_likely_sequence(ss_seq))
+        for ss_seq in prediction_secondary
+    ]
 
     seq = append_zero_residues(np.unique(sequence, return_counts=True))
 
@@ -464,15 +452,14 @@ def make_model_summary(
     index = np.array([0, 1, 2, 3, 4])
     
     accuracy, top_three, similarity, recall, precision = get_cath.score(
-        df, predictions, by_fragment, ignore_uncommon, score_sequence
+        df, predictions, False, ignore_uncommon,
     )
     # show accuracy
     ax[0][0].bar(x=index, height=accuracy, width=0.8, align="center")
 
     # show top three accuracy
-    if not score_sequence:
-        ax[0][0].scatter(x=index, y=top_three, marker="_", s=50, color="blue")
-        ax[0][0].vlines(x=index, ymin=0, ymax=top_three, linewidth=2)
+    ax[0][0].scatter(x=index, y=top_three, marker="_", s=50, color="blue")
+    ax[0][0].vlines(x=index, ymin=0, ymax=top_three, linewidth=2)
     # show recall
     ax[0][1].bar(x=index, height=recall, width=0.8, align="center")
     ax[0][3].bar(x=index, height=precision, width=0.8, align="center")
@@ -594,8 +581,7 @@ def make_model_summary(
         df,
         predictions,
         ignore_uncommon=ignore_uncommon,
-        score_sequence=score_sequence,
-        by_fragment=by_fragment,
+        by_fragment=True,
     )
     resolution = get_cath.get_resolution(df, path_to_pdb)
     # calculate Pearson correlation between accuracy/recall and resolution.
@@ -618,12 +604,9 @@ def make_model_summary(
     # show per residue metrics about the model
     gs = ax[0, 0].get_gridspec()
     # show per residue entropy
-    if not score_sequence:
-        ax[2][0].bar(by_residue_frame.index, by_residue_frame.entropy)
-        ax[2][0].set_ylabel("Entropy")
-        ax[2][0].set_xlabel("Amino acids")
-    else:
-        ax[2][0].remove()
+    ax[2][0].bar(by_residue_frame.index, by_residue_frame.entropy)
+    ax[2][0].set_ylabel("Entropy")
+    ax[2][0].set_xlabel("Amino acids")
 
     # make one big subplot
     for a in ax[2, 1:]:
@@ -654,13 +637,9 @@ def make_model_summary(
     ax_right.set_ylim(0, 1)
 
     #show auc values
-    if not score_sequence:
-         # show AUC
-        ax[1][0].bar(by_residue_frame.index, by_residue_frame.auc)
-        ax[1][0].set_ylabel("AUC")
-        ax[1][0].set_xlabel("Amino acids")
-    else:
-        ax[1][0].remove()
+    ax[1][0].bar(by_residue_frame.index, by_residue_frame.auc)
+    ax[1][0].set_ylabel("AUC")
+    ax[1][0].set_xlabel("Amino acids")
     #Remove empty subplots.
     ax[1][1].remove()
     ax[1][2].remove()
@@ -678,8 +657,7 @@ def compare_model_accuracy(
     model_scores: List[dict],
     model_labels: List[str],
     location: Path,
-    ignore_uncommon: bool,
-    by_fragment: bool,
+    ignore_uncommon: List[bool],
 ) -> None:
     """
     Compares all the models in model_scores.
@@ -696,33 +674,19 @@ def compare_model_accuracy(
         List with model names corresponding to dictionaries in model_scores.
     location:Path
         Location where to store the .pdf file.
-    by_fragment: bool
-        If true scores only CATH fragments, if False, scores entire chain.
-    ignore_uncommon=True
-        If True, ignores uncommon residues in accuracy calculations."""
+    ignore_uncommon=List[bool]
+        If True, ignores uncommon residues in accuracy calculations. Required for EvoEF2."""
 
     models = []
-    for model, label in zip(model_scores, model_labels):
-        if label != "EvoEF2":
-            models.append(
-                get_cath.score_by_architecture(
-                    df,
-                    model,
-                    ignore_uncommon=ignore_uncommon,
-                    by_fragment=by_fragment,
-                )
+    for model, ignore in zip(model_scores, ignore_uncommon):
+        models.append(
+            get_cath.score_by_architecture(
+                df,
+                model,
+                ignore_uncommon=ignore,
+                by_fragment=True,
             )
-        else:
-            models.append(
-                get_cath.score_by_architecture(
-                    df,
-                    model,
-                    ignore_uncommon=True,
-                    by_fragment=by_fragment,
-                    score_sequence=True,
-                )
-            )
-
+        )
     # Plot CATH architectures
     minimum = 0
     maximum = 0
@@ -908,18 +872,9 @@ def compare_model_accuracy(
     fig_secondary, ax_secondary = plt.subplots(2, 2, figsize=(12 * len(class_key), 10))
     index = np.array([0, 1, 2, 3, 4])
     for j, model in enumerate(model_scores):
-        if model_labels[j] != "EvoEF2":
-            accuracy, top_three, similarity, recall, precision = get_cath.score(
-                df, model, by_fragment, ignore_uncommon
-            )
-        else:
-            accuracy, top_three, similarity, recall, precision = get_cath.score(
-                df,
-                model,
-                by_fragment,
-                ignore_uncommon=True,
-                score_sequence=True,
-            )
+        accuracy, top_three, similarity, recall, precision = get_cath.score(
+            df, model, False, ignore_uncommon[j],
+        )
         # show accuracy
         ax_secondary[0][0].bar(
             x=index + j * 0.1,
@@ -930,13 +885,12 @@ def compare_model_accuracy(
             label=model_labels[j],
         )
         # show top three accuracy
-        if model_labels[j] != "EvoEF2":
-            ax_secondary[0][0].scatter(
-                x=index + j * 0.1, y=top_three, marker="_", s=50, color=colors[j]
-            )
-            ax_secondary[0][0].vlines(
-                x=index + j * 0.1, ymin=0, ymax=top_three, color=colors[j], linewidth=2
-            )
+        ax_secondary[0][0].scatter(
+            x=index + j * 0.1, y=top_three, marker="_", s=50, color=colors[j]
+        )
+        ax_secondary[0][0].vlines(
+            x=index + j * 0.1, ymin=0, ymax=top_three, color=colors[j], linewidth=2
+        )
         # show recall
         ax_secondary[0][1].bar(
             x=index + j * 0.1,

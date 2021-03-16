@@ -120,7 +120,7 @@ def tag_dssp_data(assembly: ampal.Assembly) -> None:
 
 
 def get_sequence(
-    series: pd.Series, path_to_assemblies: Path
+    series: pd.Series, path_to_pdb: Path
 ) -> Tuple[str, str, int, int, List[int]]:
     """Gets a sequence of from PDB file, CATH fragment indexes and secondary structure labels.
 
@@ -145,17 +145,11 @@ def get_sequence(
         List with residue number of uncommon amino acids.
     """
 
-    path = path_to_assemblies / series.PDB[1:3] / f"{series.PDB}.pdb1.gz"
+    path = path_to_pdb / series.PDB[1:3] / f"pdb{series.PDB}.ent.gz"
 
     if path.exists():
         with gzip.open(path, "rb") as protein:
             assembly = ampal.load_pdb(protein.read().decode(), path=False)
-            # check is assembly has multiple states, pick the first
-            if isinstance(assembly, ampal.assembly.AmpalContainer):
-                if assembly[0].id.count("_state_") > 0:
-                    assembly = assembly[0]
-            # convert pdb res id into sequence index,
-            # some files have discontinuous residue ids so ampal.get_slice_from_res_id() does not work
             # convert pdb res id into sequence index,
             # some files have discontinuous residue ids so ampal.get_slice_from_res_id() does not work
             start = 0
@@ -174,7 +168,7 @@ def get_sequence(
             except KeyError:
                 raise KeyError(f"{series.PDB}.pdb1 is missing chain {series.chain}.")
 
-            # compatibility with evoef and leo's model, store uncommon residue index in a separate column and include regular amino acid in the sequence
+            # compatibility with evoef and leo's model, store non-canonical residue index in a separate column and include regular amino acid in the sequence
             sequence = ""
             uncommon_index = []
             dssp = ""
@@ -292,7 +286,7 @@ def get_resolution(df: pd.DataFrame, path_to_pdb: Path) -> List[float]:
 
 
 def append_sequence(
-    df: pd.DataFrame, path_to_assemblies: Path, path_to_pdb: Path
+    df: pd.DataFrame, path_to_pdb: Path
 ) -> pd.DataFrame:
     """Get sequences for all entries in the dataframe, changes start and stop from PDB resid to index number,adds resolution of each chain.
 
@@ -300,8 +294,6 @@ def append_sequence(
     ----------
     df: pd.DataFrame
         CATH dataframe.
-    path_to_assemblies: Path
-        Path to the directory with biological assemblies.
     path_to_pdb: Path
         Path to the directory with PDB files.
 
@@ -314,7 +306,7 @@ def append_sequence(
     # make copy to avoid changing original df.
     working_copy = df.copy()
     sequence, dssp, start, stop, uncommon_index = zip(
-        *[get_sequence(x, path_to_assemblies) for i, x in df.iterrows()]
+        *[get_sequence(x, path_to_pdb) for i, x in df.iterrows()]
     )
     working_copy.loc[:, "sequence"] = sequence
     working_copy.loc[:, "dssp"] = dssp
@@ -509,42 +501,6 @@ def multi_Evo2EF(
     with multiprocessing.Pool(max_processes) as P:
         P.starmap(run_Evo2EF, inputs)
 
-
-def load_prediction_sequence(df: pd.DataFrame, path: Path) -> dict:
-    """Loads EvoEF2 predicted sequences from .txt to dictionary, drops entries for which sequence prediction fails.
-    Parameters
-    ----------
-    df: pd.DataFrame
-        CATH dataframe.
-    path:Path
-        Path to prediction directory.
-
-    Returns
-    -------
-    predicted_sequences:dict
-        Dictionary with predicted sequences, key is PDB+chain."""
-
-    predicted_sequences = {}
-    path = Path(path)
-    for i, protein in df.iterrows():
-        prediction_path = path / f"{protein.PDB}{protein.chain}.txt"
-        # check for empty and missing files
-        if prediction_path.exists() and os.path.getsize(prediction_path) > 0:
-            with open(prediction_path) as prediction:
-                seq = prediction.readline().split()[0]
-                if seq != "0":
-                    predicted_sequences[protein.PDB + protein.chain] = seq
-                else:
-                    warnings.warn(
-                        f"EvoEF2: {protein.PDB}{protein.chain} prediction does not exits, EvoEF2 returned 0."
-                    )
-        else:
-            warnings.warn(
-                f"EvoEF2: {protein.PDB}{protein.chain} prediction does not exits."
-            )
-    return predicted_sequences
-
-
 def load_prediction_matrix(
     df: pd.DataFrame, path_to_dataset: Path, path_to_probabilities: Path
 ) -> dict:
@@ -565,16 +521,15 @@ def load_prediction_matrix(
 
     path_to_dataset = Path(path_to_dataset)
     path_to_probabilities = Path(path_to_probabilities)
+    counter=0
     with open(path_to_dataset) as file:
-        labels = [(x.split(",")[0], int(x.split(",")[2])) for x in file.readlines()]
+        labels = [x.strip('\n').split() for x in file.readlines()[2:]]
     predictions = pd.read_csv(path_to_probabilities, header=None).values
     empty_dict = {k: [] for k in df.PDB.values + df.chain.values}
-    for probability, pdb in zip(predictions, labels):
-        if pdb[0] in empty_dict:
-            empty_dict[pdb[0]].append((pdb[1], probability))
-    # sort predictions into a protein sequence
-    for protein in empty_dict:
-        empty_dict[protein] = np.array([x[1] for x in sorted(empty_dict[protein])])
+    for chain in labels:
+        if chain[0] in empty_dict:
+            empty_dict[chain[0]]=predictions[counter:counter+int(chain[1])]
+            counter+=int(chain[1])
     # drop keys with missing values
     filtered_empty_dict = {
         key: empty_dict[key] for key in empty_dict if len(empty_dict[key]) != 0
@@ -582,7 +537,7 @@ def load_prediction_matrix(
     # warn about missing predictions
     missing_structures = [x for x in empty_dict if x not in filtered_empty_dict]
     if len(missing_structures) > 0:
-        warnings.warn(f"ML models: {*missing_structures,} predictions are missing.")
+        warnings.warn(f"{path_to_probabilities.name}: {*missing_structures,} predictions are missing.")
     return filtered_empty_dict
 
 
@@ -611,8 +566,7 @@ def format_sequence(
     df: pd.DataFrame,
     predictions: dict,
     by_fragment: bool = True,
-    ignore_uncommon=False,
-    score_sequence=False,
+    ignore_uncommon:bool=False,
 ) -> Tuple[np.array, np.array, np.array, List[List], List[List]]:
     """
     Concatenates and formats all sequences in the DataFrame for metrics calculations.
@@ -647,10 +601,7 @@ def format_sequence(
     dssp = ""
     # Store failed structures
     failed = []
-    if score_sequence:
-        prediction = ""
-    else:
-        prediction = np.empty([0, 20])
+    prediction = np.empty([0, 20])
     for i, protein in df.iterrows():
         if protein.PDB + protein.chain in predictions:
             start = protein.start
@@ -699,12 +650,9 @@ def format_sequence(
             ) == len(protein_dssp):
                 sequence += protein_sequence
                 dssp += protein_dssp
-                if score_sequence:
-                    prediction += predicted_sequence
-                else:
-                    prediction = np.concatenate(
-                        [prediction, predicted_sequence], axis=0
-                    )
+                prediction = np.concatenate(
+                    [prediction, predicted_sequence], axis=0
+                )
             else:
                 failed.append(protein.PDB + protein.chain)
     # Get all failed structures.
@@ -715,8 +663,6 @@ def format_sequence(
 
     sequence = np.array(list(sequence))
     dssp = np.array(list(dssp))
-    if score_sequence:
-        prediction = np.array(list(prediction))
     # format secondary structures
     true_secondary = [[], [], [], []]
     prediction_secondary = [[], [], [], []]
@@ -742,7 +688,6 @@ def score(
     predictions: dict,
     by_fragment: bool = True,
     ignore_uncommon=False,
-    score_sequence=False,
 ) -> Tuple[List[float], List[float], List[float], List[float], List[float]]:
     """Concatenates and scores all predicted sequences in the DataFrame.
 
@@ -772,7 +717,7 @@ def score(
     precision: List[float]
         List with macro average precision."""
     sequence, prediction, dssp, true_secondary, predicted_secondary = format_sequence(
-        df, predictions, by_fragment, ignore_uncommon, score_sequence
+        df, predictions, by_fragment, ignore_uncommon,
     )
     accuracy = []
     recall = []
@@ -780,124 +725,71 @@ def score(
     top_three = []
     precision = []
 
-    if score_sequence:
-        prediction = np.array(list(prediction))
-        accuracy.append(metrics.accuracy_score(sequence, prediction))
-        recall.append(
-            metrics.recall_score(sequence, prediction, average="macro", zero_division=0)
+    most_likely_seq = list(most_likely_sequence(prediction))
+    accuracy.append(metrics.accuracy_score(sequence, most_likely_seq))
+    recall.append(
+        metrics.recall_score(
+            sequence, most_likely_seq, average="macro", zero_division=0
         )
-        precision.append(
-            metrics.precision_score(
-                sequence, prediction, average="macro", zero_division=0
+    )
+    precision.append(
+        metrics.precision_score(
+            sequence, most_likely_seq, average="macro", zero_division=0
+        )
+    )
+    similarity_score = [
+        1 if lookup_blosum62(a, b) > 0 else 0
+        for a, b in zip(sequence, most_likely_seq)
+    ]
+    similarity.append(sum(similarity_score) / len(similarity_score))
+    top_three.append(
+        metrics.top_k_accuracy_score(sequence, prediction, k=3, labels=config.acids)
+    )
+    for seq_type in range(len(true_secondary)):
+        # not all architectures have examples of all secondary structure types.
+        if len(true_secondary[seq_type]) > 0:
+            secondary_sequence = list(
+                most_likely_sequence(predicted_secondary[seq_type])
             )
-        )
-        similarity_score = [
-            1 if lookup_blosum62(a, b) > 0 else 0 for a, b in zip(sequence, prediction)
-        ]
-        similarity.append(sum(similarity_score) / len(similarity_score))
-        for seq_type in range(len(true_secondary)):
-            if len(true_secondary[seq_type]) > 0:
-                accuracy.append(
-                    metrics.accuracy_score(
-                        true_secondary[seq_type], predicted_secondary[seq_type]
-                    )
-                )
-                precision.append(
-                    metrics.precision_score(
-                        true_secondary[seq_type],
-                        predicted_secondary[seq_type],
-                        average="macro",
-                        zero_division=0,
-                    )
-                )
-                recall.append(
-                    metrics.recall_score(
-                        true_secondary[seq_type],
-                        predicted_secondary[seq_type],
-                        average="macro",
-                        zero_division=0,
-                    )
-                )
-                similarity_score = [
-                    1 if lookup_blosum62(a, b) > 0 else 0
-                    for a, b in zip(
-                        true_secondary[seq_type], predicted_secondary[seq_type]
-                    )
-                ]
-
-                similarity.append(sum(similarity_score) / len(similarity_score))
-            else:
-                accuracy.append(0)
-                recall.append(0)
-                similarity.append(0)
-                precision.append(0)
-
-    else:
-        most_likely_seq = list(most_likely_sequence(prediction))
-        accuracy.append(metrics.accuracy_score(sequence, most_likely_seq))
-        recall.append(
-            metrics.recall_score(
-                sequence, most_likely_seq, average="macro", zero_division=0
+            accuracy.append(
+                metrics.accuracy_score(true_secondary[seq_type], secondary_sequence)
             )
-        )
-        precision.append(
-            metrics.precision_score(
-                sequence, most_likely_seq, average="macro", zero_division=0
+            recall.append(
+                metrics.recall_score(
+                    true_secondary[seq_type],
+                    secondary_sequence,
+                    average="macro",
+                    zero_division=0,
+                )
             )
-        )
-        similarity_score = [
-            1 if lookup_blosum62(a, b) > 0 else 0
-            for a, b in zip(sequence, most_likely_seq)
-        ]
-        similarity.append(sum(similarity_score) / len(similarity_score))
-        top_three.append(
-            metrics.top_k_accuracy_score(sequence, prediction, k=3, labels=config.acids)
-        )
-        for seq_type in range(len(true_secondary)):
-            # not all architectures have examples of all secondary structure types.
-            if len(true_secondary[seq_type]) > 0:
-                secondary_sequence = list(
-                    most_likely_sequence(predicted_secondary[seq_type])
+            precision.append(
+                metrics.precision_score(
+                    true_secondary[seq_type],
+                    secondary_sequence,
+                    average="macro",
+                    zero_division=0,
                 )
-                accuracy.append(
-                    metrics.accuracy_score(true_secondary[seq_type], secondary_sequence)
-                )
-                recall.append(
-                    metrics.recall_score(
-                        true_secondary[seq_type],
-                        secondary_sequence,
-                        average="macro",
-                        zero_division=0,
-                    )
-                )
-                precision.append(
-                    metrics.precision_score(
-                        true_secondary[seq_type],
-                        secondary_sequence,
-                        average="macro",
-                        zero_division=0,
-                    )
-                )
-                similarity_score = [
-                    1 if lookup_blosum62(a, b) > 0 else 0
-                    for a, b in zip(true_secondary[seq_type], secondary_sequence)
-                ]
+            )
+            similarity_score = [
+                1 if lookup_blosum62(a, b) > 0 else 0
+                for a, b in zip(true_secondary[seq_type], secondary_sequence)
+            ]
 
-                top_three.append(
-                    metrics.top_k_accuracy_score(
-                        true_secondary[seq_type],
-                        predicted_secondary[seq_type],
-                        k=3,
-                        labels=config.acids,
-                    )
+            top_three.append(
+                metrics.top_k_accuracy_score(
+                    true_secondary[seq_type],
+                    predicted_secondary[seq_type],
+                    k=3,
+                    labels=config.acids,
                 )
-                similarity.append(sum(similarity_score) / len(similarity_score))
-            else:
-                accuracy.append(0)
-                top_three.append(0)
-                similarity.append(0)
-                recall.append(0)
-                precision.append(0)
+            )
+            similarity.append(sum(similarity_score) / len(similarity_score))
+        else:
+            accuracy.append(0)
+            top_three.append(0)
+            similarity.append(0)
+            recall.append(0)
+            precision.append(0)
     return accuracy, top_three, similarity, recall, precision
 
 
@@ -906,7 +798,6 @@ def score_by_architecture(
     predictions: dict,
     by_fragment: bool = True,
     ignore_uncommon: bool = False,
-    score_sequence: bool = False,
 ) -> pd.DataFrame:
     """Groups predictions by architecture and scores each separately.
 
@@ -939,28 +830,17 @@ def score_by_architecture(
             predictions,
             by_fragment,
             ignore_uncommon,
-            score_sequence,
         )
-        if score_sequence:
-            scores.append([accuracy[0], similarity[0], recall[0], precision[0]])
-        else:
-            scores.append(
-                [accuracy[0], top_three[0], similarity[0], recall[0], precision[0]]
-            )
+        scores.append(
+            [accuracy[0], top_three[0], similarity[0], recall[0], precision[0]]
+        )
         # lookup normal names
         names.append(config.architectures[f"{cls}.{arch}"])
-    if score_sequence:
-        score_frame = pd.DataFrame(
-            scores,
-            columns=["accuracy", "similarity", "recall", "precision"],
-            index=[classes, architectures],
-        )
-    else:
-        score_frame = pd.DataFrame(
-            scores,
-            columns=["accuracy", "top3_accuracy", "similarity", "recall", "precision"],
-            index=[classes, architectures],
-        )
+    score_frame = pd.DataFrame(
+        scores,
+        columns=["accuracy", "top3_accuracy", "similarity", "recall", "precision"],
+        index=[classes, architectures],
+    )
     score_frame["name"] = names
     return score_frame
 
@@ -970,7 +850,6 @@ def score_each(
     predictions: dict,
     by_fragment: bool = True,
     ignore_uncommon=False,
-    score_sequence=False,
 ) -> Tuple[List[float], List[float]]:
     """Calculates accuracy and recall for each protein in DataFrame separately.
 
@@ -1031,35 +910,21 @@ def score_each(
             if by_fragment:
                 protein_sequence = protein_sequence[start : stop + 1]
                 predicted_sequence = predicted_sequence[start : stop + 1]
-            if score_sequence:
-                accuracy.append(
-                    metrics.accuracy_score(
-                        list(protein_sequence), list(predicted_sequence)
-                    )
+            
+            accuracy.append(
+                metrics.accuracy_score(
+                    list(protein_sequence),
+                    list(most_likely_sequence(predicted_sequence)),
                 )
-                recall.append(
-                    metrics.recall_score(
-                        list(protein_sequence),
-                        list(predicted_sequence),
-                        average="macro",
-                        zero_division=0,
-                    )
+            )
+            recall.append(
+                metrics.recall_score(
+                    list(protein_sequence),
+                    list(most_likely_sequence(predicted_sequence)),
+                    average="macro",
+                    zero_division=0,
                 )
-            else:
-                accuracy.append(
-                    metrics.accuracy_score(
-                        list(protein_sequence),
-                        list(most_likely_sequence(predicted_sequence)),
-                    )
-                )
-                recall.append(
-                    metrics.recall_score(
-                        list(protein_sequence),
-                        list(most_likely_sequence(predicted_sequence)),
-                        average="macro",
-                        zero_division=0,
-                    )
-                )
+            )
         else:
             accuracy.append(np.NaN)
             recall.append(np.NaN)
@@ -1068,7 +933,7 @@ def score_each(
 
 
 def get_by_residue_metrics(
-    sequence: np.array, prediction: np.array, issequence: bool
+    sequence: np.array, prediction: np.array,
 ) -> pd.DataFrame:
     """Calculates recall,precision and f1 for each amino acid.
     Parameters
@@ -1084,19 +949,15 @@ def get_by_residue_metrics(
         DataFrame with recall, precision, f1 score, entropy and AUC for each amino acids.
     """
 
-    if not issequence:
-        entropy_arr = entropy(prediction, base=2, axis=1)
-        # calculate auc values
-        labels = LabelBinarizer().fit(config.acids).transform(sequence)
-        roc_auc = []
-        for i in range(len(config.acids)):
-            fpr, tpr, _ = metrics.roc_curve(labels[:, i], prediction[:, i])
-            roc_auc.append(metrics.auc(fpr, tpr))
-        prediction = list(most_likely_sequence(prediction))
+    entropy_arr = entropy(prediction, base=2, axis=1)
+    # calculate auc values
+    labels = LabelBinarizer().fit(config.acids).transform(sequence)
+    roc_auc = []
+    for i in range(len(config.acids)):
+        fpr, tpr, _ = metrics.roc_curve(labels[:, i], prediction[:, i])
+        roc_auc.append(metrics.auc(fpr, tpr))
+    prediction = list(most_likely_sequence(prediction))
 
-    else:
-        entropy_arr = np.empty(len(sequence))
-        entropy_arr[:] = np.NaN
     # prevents crashing when not all amino acids are predicted
     entropy_frame = pd.DataFrame(index=config.acids)
     entropy_frame = entropy_frame.join(
@@ -1109,8 +970,7 @@ def get_by_residue_metrics(
     entropy_frame.loc[:, "recall"] = rec
     entropy_frame.loc[:, "precision"] = prec
     entropy_frame.loc[:, "f1"] = f1
-    if not issequence:
-        entropy_frame.loc[:, "auc"] = roc_auc
+    entropy_frame.loc[:, "auc"] = roc_auc
     return entropy_frame
 
 
