@@ -279,7 +279,11 @@ def get_resolution(df: pd.DataFrame, path_to_pdb: Path) -> List[float]:
             with gzip.open(path, "rb") as pdb:
                 pdb_text = pdb.read().decode()
             item = re.findall("REMARK   2 RESOLUTION.*$", pdb_text, re.MULTILINE)
-            res.append(float(item[0].split()[3]))
+            #nmr structures have no resolution
+            if item[0].split()[3]!='NOT':
+                res.append(float(item[0].split()[3]))
+            else:
+                res.append(0.0)
         else:
             res.append(np.NaN)
     return res
@@ -742,9 +746,14 @@ def score(
         for a, b in zip(sequence, most_likely_seq)
     ]
     similarity.append(sum(similarity_score) / len(similarity_score))
-    top_three.append(
-        metrics.top_k_accuracy_score(sequence, prediction, k=3, labels=config.acids)
-    )
+    #check if probabilities or encoded sequences, encoded sequence has 0 entropy.
+    is_prob=sum(entropy(prediction, base=2, axis=1))
+    if is_prob:
+        top_three.append(
+            metrics.top_k_accuracy_score(sequence, prediction, k=3, labels=config.acids)
+        )
+    else:
+         top_three.append(np.NaN)
     for seq_type in range(len(true_secondary)):
         # not all architectures have examples of all secondary structure types.
         if len(true_secondary[seq_type]) > 0:
@@ -774,15 +783,17 @@ def score(
                 1 if lookup_blosum62(a, b) > 0 else 0
                 for a, b in zip(true_secondary[seq_type], secondary_sequence)
             ]
-
-            top_three.append(
-                metrics.top_k_accuracy_score(
-                    true_secondary[seq_type],
-                    predicted_secondary[seq_type],
-                    k=3,
-                    labels=config.acids,
+            if is_prob:
+                top_three.append(
+                    metrics.top_k_accuracy_score(
+                        true_secondary[seq_type],
+                        predicted_secondary[seq_type],
+                        k=3,
+                        labels=config.acids,
+                    )
                 )
-            )
+            else:
+                top_three.append(np.NaN)
             similarity.append(sum(similarity_score) / len(similarity_score))
         else:
             accuracy.append(0)
