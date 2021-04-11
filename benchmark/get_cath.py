@@ -424,7 +424,7 @@ def load_prediction_matrix(
         counter+=int(chain[1])
     # drop keys with missing values
     filtered_empty_dict = {
-        key: empty_dict[key] for key in empty_dict if len(empty_dict[key]) != 0
+         k: v for k, v in empty_dict.items() if len(v) != 0
     }
     # warn about missing predictions
     missing_structures = [x for x in empty_dict if x not in filtered_empty_dict]

@@ -26,7 +26,7 @@ def check_sets(dataset: Path, training_set: Path):
     with open(dataset) as file:
         testing_chains = [x.split()[0][:4].upper() for x in file.readlines()]
 
-    repeated_chains = [x for x in testing_chains if x in training_chains]
+    repeated_chains = set(testing_chains).intersection(set(training_chains))
 
     if len(repeated_chains) > 0:
         print(f"{len(repeated_chains)} chains are in both sets:")
@@ -114,7 +114,7 @@ def compare_models(
     else:
         # Warn and ask for confirmation to continue.
         if click.confirm(
-            "Cannot compare training and testing sets. Do you want to continue?"
+            "Cannot compare training and testing sets. YOUR COMPARISON MIGHT NOT BE STATISTICALLY MEANINGFUL. Do you want to continue?"
         ):
             click.echo("Continuing!")
         else:
