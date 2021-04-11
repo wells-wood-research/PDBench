@@ -127,12 +127,9 @@ def show_accuracy(
     prediction = list(get_cath.most_likely_sequence(prediction))
     for resa, resb in zip(sequence, prediction):
         """correct predictions are given constant score so they stand out in the figure.
-        e.g., spectrum b, blue_white_red, maximum=6,minimum=-6 gives nice plots. Bright red shows correct predictions
+        e.g., spectrum q, blue_white_red, maximum=6,minimum=-6 gives nice plots. Bright red shows correct predictions
         Red shades indicate substitutions with positive score, white=0, blue shades show substiutions with negative score.
-
-        spectrum q, minimum=20.0,maximum=21.0
-        as cartoon, cartoon putty
-        shows nice entropy visualization."""
+        cartoon putty shows nice entropy visualization."""
 
         if resa == resb:
             accuracy.append(6)
@@ -151,7 +148,7 @@ def show_accuracy(
     assembly = assembly[pdb_df.chain.values[0]]
     
     curr_annotated_structure = _annotate_ampalobj_with_data_tag(
-        assembly, [accuracy, entropy_arr], tags=["bfactor", "occupancy"]
+        assembly, [accuracy, entropy_arr], tags=["occupancy","bfactor"]
     )
     with open(output, "w") as f:
         f.write(curr_annotated_structure.pdb)

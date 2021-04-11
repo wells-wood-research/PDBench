@@ -161,12 +161,12 @@ def get_sequence(
             try:
                 tag_dssp_data(assembly)
             except CalledProcessError:
-                raise CalledProcessError(f"dssp failed on {series.PDB}.pdb1.")
+                raise CalledProcessError(f"dssp failed on {series.PDB}.pdb.")
             # some biological assemblies are broken
             try:
                 chain = assembly[series.chain]
             except KeyError:
-                raise KeyError(f"{series.PDB}.pdb1 is missing chain {series.chain}.")
+                raise KeyError(f"{series.PDB}.pdb is missing chain {series.chain}.")
 
             # compatibility with evoef and leo's model, store non-canonical residue index in a separate column and include regular amino acid in the sequence
             sequence = ""
@@ -188,7 +188,7 @@ def get_sequence(
                         )
                     except KeyError:
                         raise ValueError(
-                            f"{series.PDB}.pdb1 has unrecognized amino acid {residue.mol_code}."
+                            f"{series.PDB}.pdb has unrecognized amino acid {residue.mol_code}."
                         )
                 else:
                     sequence += one_letter_code
@@ -206,11 +206,12 @@ def get_sequence(
                 else:
                     if residue.id == series.stop:
                         stop = i
-
+        if uncommon_index==[]:
+            uncommon_index=np.NaN
         return sequence, dssp, start, stop, uncommon_index
     else:
         raise FileNotFoundError(
-            f"{series.PDB}.pdb1 is missing, download it or remove it from your dataset."
+            f"{series.PDB}.pdb is missing, download it or remove it from your dataset."
         )
 
 
@@ -316,7 +317,7 @@ def append_sequence(
     working_copy.loc[:, "dssp"] = dssp
     working_copy.loc[:, "start"] = start
     working_copy.loc[:, "stop"] = stop
-    working_copy.loc[:, "uncommon_index"] = np.array(uncommon_index, dtype="object")
+    working_copy.loc[:, "uncommon_index"]=uncommon_index
     working_copy.loc[:, "resolution"] = get_resolution(working_copy, path_to_pdb)
 
     return working_copy
@@ -392,119 +393,6 @@ def lookup_blosum62(res_true: str, res_prediction: str) -> int:
     else:
         return config.blosum62[res_prediction, res_true]
 
-
-def run_Evo2EF(
-    pdb: str, chain: str, number_of_runs: str, working_dir: Path, path_to_evoef2: Path
-) -> None:
-    """Runs a shell script to predict sequence with EvoEF2
-
-    Patameters
-    ----------
-    path: str
-        Path to PDB biological unit.
-    pdb: str
-        PDB code.
-    chain: str
-        Chain code.
-    number_of_runs: str
-       Number of sequences to be generated.
-    working_dir: str
-      Dir where to store temporary files and results.
-    path_to_EvoEF2: Path
-        Location of EvoEF2 executable.
-    """
-
-    print(f"Starting {pdb}{chain}.")
-
-    # evo.sh must be in the same directory as this file.
-    p = subprocess.Popen(
-        [
-            os.path.dirname(os.path.realpath(__file__)) + "/evo.sh",
-            pdb,
-            chain,
-            number_of_runs,
-            working_dir,
-            path_to_evoef2,
-        ]
-    )
-    p.wait()
-    print(f"{pdb}{chain} done.")
-
-
-def multi_Evo2EF(
-    df: pd.DataFrame,
-    number_of_runs: int,
-    working_dir: Path,
-    path_to_assemblies: Path,
-    path_to_evoef2: Path,
-    max_processes: int = 8,
-) -> None:
-    """Runs Evo2EF on all PDB chains in the DataFrame.
-
-    Parameters
-    ----------
-    df: pd.DataFrame
-        DataFrame with PDB and chain codes.
-    number_of_runs: int
-        Number of sequences to be generated for each PDB file.
-    max_processes: int = 8
-        Number of cores to use, default is 8.
-    working_dir: Path
-      Dir where to store temporary files and results.
-    path_to_assemblies: Path
-        Dir with biological assemblies.
-    path_to_EvoEF2: Path
-        Location of EvoEF2 executable.
-
-    """
-
-    inputs = []
-    # remove duplicated chains
-    df = df.drop_duplicates(subset=["PDB", "chain"])
-
-    # check if working directory exists. Make one if doesn't exist.
-    if not working_dir.exists():
-        os.makedirs(working_dir)
-    if not (working_dir / "results/").exists():
-        os.makedirs(working_dir / "results/")
-
-    print(f"{df.shape[0]} structures will be predicted.")
-
-    for i, protein in df.iterrows():
-        with gzip.open(
-            path_to_assemblies / protein.PDB[1:3] / f"{protein.PDB}.pdb1.gz"
-        ) as file:
-            assembly = ampal.load_pdb(file.read().decode(), path=False)
-        # fuse all states of the assembly into one state to avoid EvoEF2 errors.
-        empty_polymer = ampal.Assembly()
-        chain_id = []
-        for polymer in assembly:
-            for chain in polymer:
-                empty_polymer.append(chain)
-                chain_id.append(chain.id)
-        # relabel chains to avoid repetition, remove ligands.
-        str_list = string.ascii_uppercase.replace(protein.chain, "")
-        index = chain_id.index(protein.chain)
-        chain_id = list(str_list[: len(chain_id)])
-        chain_id[index] = protein.chain
-        empty_polymer.relabel_polymers(chain_id)
-        pdb_text = empty_polymer.make_pdb(alt_states=False, ligands=False)
-        # writing new pdb with AMPAL fixes most of the errors with EvoEF2.
-        with open((working_dir / protein.PDB).with_suffix(".pdb1"), "w") as pdb_file:
-            pdb_file.write(pdb_text)
-        inputs.append(
-            (
-                protein.PDB,
-                protein.chain,
-                str(number_of_runs),
-                working_dir,
-                path_to_evoef2,
-            )
-        )
-
-    with multiprocessing.Pool(max_processes) as P:
-        P.starmap(run_Evo2EF, inputs)
-
 def load_prediction_matrix(
     df: pd.DataFrame, path_to_dataset: Path, path_to_probabilities: Path
 ) -> dict:
@@ -527,13 +415,13 @@ def load_prediction_matrix(
     path_to_probabilities = Path(path_to_probabilities)
     counter=0
     with open(path_to_dataset) as file:
-        labels = [x.strip('\n').split() for x in file.readlines()[2:]]
+        labels = [x.strip('\n').split() for x in file.readlines()[3:]]
     predictions = pd.read_csv(path_to_probabilities, header=None).values
     empty_dict = {k: [] for k in df.PDB.values + df.chain.values}
     for chain in labels:
         if chain[0] in empty_dict:
             empty_dict[chain[0]]=predictions[counter:counter+int(chain[1])]
-            counter+=int(chain[1])
+        counter+=int(chain[1])
     # drop keys with missing values
     filtered_empty_dict = {
         key: empty_dict[key] for key in empty_dict if len(empty_dict[key]) != 0
@@ -611,9 +499,8 @@ def format_sequence(
             start = protein.start
             stop = protein.stop
             predicted_sequence = predictions[protein.PDB + protein.chain]
-
             # remove uncommon acids
-            if ignore_uncommon and protein.uncommon_index != []:
+            if ignore_uncommon and type(protein.uncommon_index)==list:
                 protein_sequence = "".join(
                     [
                         x
@@ -745,7 +632,10 @@ def score(
         1 if lookup_blosum62(a, b) > 0 else 0
         for a, b in zip(sequence, most_likely_seq)
     ]
-    similarity.append(sum(similarity_score) / len(similarity_score))
+    if len(similarity_score)>0:
+        similarity.append(sum(similarity_score) / len(similarity_score))
+    else:
+        similarity.append(np.NaN)
     #check if probabilities or encoded sequences, encoded sequence has 0 entropy.
     is_prob=sum(entropy(prediction, base=2, axis=1))
     if is_prob:
@@ -796,11 +686,11 @@ def score(
                 top_three.append(np.NaN)
             similarity.append(sum(similarity_score) / len(similarity_score))
         else:
-            accuracy.append(0)
-            top_three.append(0)
-            similarity.append(0)
-            recall.append(0)
-            precision.append(0)
+            accuracy.append(np.NaN)
+            top_three.append(np.NaN)
+            similarity.append(np.NaN)
+            recall.append(np.NaN)
+            precision.append(np.NaN)
     return accuracy, top_three, similarity, recall, precision
 
 
@@ -893,7 +783,7 @@ def score_each(
             predicted_sequence = predictions[protein.PDB + protein.chain]
 
             # remove uncommon acids
-            if ignore_uncommon and protein.uncommon_index != []:
+            if ignore_uncommon and type(protein.uncommon_index)==list:
                 protein_sequence = "".join(
                     [
                         x
@@ -999,15 +889,11 @@ def get_angles(protein: pd.Series, path_to_assemblies: Path) -> np.array:
     torsion_angles: np.array
         Array with torsion angles."""
 
-    path = path_to_assemblies / protein.PDB[1:3] / f"{protein.PDB}.pdb1.gz"
+    path = path_to_assemblies / protein.PDB[1:3] / f"pdb{protein.PDB}.ent.gz"
     if path.exists():
         with gzip.open(path, "rb") as file:
             assembly = ampal.load_pdb(file.read().decode(), path=False)
             # check is assembly has multiple states, pick the first
-            if isinstance(assembly, ampal.assembly.AmpalContainer):
-                if assembly[0].id.count("_state_") > 0:
-                    assembly = assembly[0]
-                    # if nmr structure, get 1st model
             if isinstance(assembly, ampal.AmpalContainer):
                 assembly = assembly[0]
             chain = assembly[protein.chain]
@@ -1019,9 +905,8 @@ def format_angle_sequence(
     df: pd.DataFrame,
     predictions: dict,
     path_to_assemblies: Path,
-    by_fragment: bool = True,
+    by_fragment: bool = False,
     ignore_uncommon=False,
-    score_sequence=False,
 ) -> Tuple[str, Iterable, str, List[List[float]]]:
     """Gets Psi and Phi angles for all residues in predictions, can skip uncommon acids.
 
@@ -1038,9 +923,7 @@ def format_angle_sequence(
         If true scores only CATH fragments, if False, scores entire chain.
     ignore_uncommon=True
         If True, ignores uncommon residues in accuracy calculations.
-    score_sequence=False
-        True if dictionary contains sequences, False if probability matrices(matrix shape n,20).
-
+        
     Returns
     -------
     sequece:str
@@ -1056,10 +939,7 @@ def format_angle_sequence(
     sequence = ""
     dssp = ""
     torsion = []
-    if score_sequence:
-        prediction = ""
-    else:
-        prediction = np.empty([0, 20])
+    prediction = np.empty([0, 20])
     for i, protein in df.iterrows():
         if protein.PDB + protein.chain in predictions:
             start = protein.start
@@ -1120,11 +1000,8 @@ def format_angle_sequence(
                 sequence += protein_sequence
                 dssp += protein_dssp
                 torsion += protein_angle
-                if score_sequence:
-                    prediction += predicted_sequence
-                else:
-                    prediction = np.concatenate(
-                        [prediction, predicted_sequence], axis=0
+                prediction = np.concatenate(
+                    [prediction, predicted_sequence], axis=0
                     )
             else:
                 print(
