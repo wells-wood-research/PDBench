@@ -235,3 +235,28 @@ SSEQS     ECKTGNGKNYRGTMSKTKNGITCQKWSSTSPHRPRFSPATHPSEGLEENYCRNPDNDPQGPWCYTTDPEK
 SSEQS     RYDYCDILEC
 ENDSEG
 //
+FORMAT    CDDF1.0
+DOMAIN    1a62A01
+VERSION   4.3.0
+VERDATE   11-Sep-2019
+NAME      Rho. Chain: a. Fragment: RNA binding domain, residues 1 - 130. Enginee
+NAME      red: yes
+SOURCE    Escherichia coli bl21(de3). Organism_taxid: 469008. Strain: bl21 (de3)
+SOURCE    . Cell_line: bl21.  Expressed in: escherichia coli bl21(de3). Expressi
+SOURCE    on_system_taxid: 469008.
+CATHCODE  1.10.720.10
+CLASS     Mainly Alpha
+ARCH      Orthogonal Bundle
+TOPOL     Transcription Termination Factor Rho, Rna-binding Domain; Chain A, Domain 1
+HOMOL     Transcription Termination Factor Rho, Rna-binding Domain; Chain A, Domain 1
+DLENGTH   44
+DSEQH     >pdb|1a62A01
+DSEQS     NLTELKNTPVSELITLGENGLENLARRKQDIIFAILKQHAKSGE
+NSEGMENTS 1
+SEGMENT   1a62A01:1:1
+SRANGE    START=2  STOP=47
+SLENGTH   44
+SSEQH     >pdb|1a62A01:1:1
+SSEQS     NLTELKNTPVSELITLGENGLENLARRKQDIIFAILKQHAKSGE
+ENDSEG
+//
