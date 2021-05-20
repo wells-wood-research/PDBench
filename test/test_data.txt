@@ -1,0 +1,13 @@
+ignore_uncommon False
+include_pdbs 
+##########
+1a41A 221
+1a92A 50
+1b2pA 119
+1b77A 228
+1b8kA 90
+1bx7A 51
+1c1yB 77
+1c3mA 145
+1chdA 198
+1cruA 448

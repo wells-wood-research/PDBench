@@ -218,6 +218,7 @@ def ramachandran_plot(
         im = ax[k][0].imshow(
             array,
             interpolation="none",
+            origin='lower',
             norm=None,
             extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]],
             cmap="viridis",
@@ -241,6 +242,7 @@ def ramachandran_plot(
         im = ax[k][1].imshow(
             true_array,
             interpolation="none",
+            origin='lower',
             norm=None,
             extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]],
             cmap="viridis",
@@ -265,6 +267,7 @@ def ramachandran_plot(
         im = ax[k][2].imshow(
             difference,
             interpolation="none",
+            origin='lower',
             norm=None,
             extent=[xedges[0], xedges[-1], yedges[0], yedges[-1]],
             cmap="viridis",
@@ -361,6 +364,8 @@ def make_model_summary(
     index = np.arange(len(seq[0]))
     # calculate prediction bias
     residue_bias = pred[1] / sum(pred[1]) - seq[1] / sum(seq[1])
+    #keep max bias to scale all graphs
+    max_bias=max(residue_bias)
     ax[3][4].bar(x=index, height=residue_bias, width=0.8, align="center")
     ax[3][4].set_ylabel("Prediction bias")
     ax[3][4].set_xlabel("Amino acids")
@@ -371,7 +376,7 @@ def make_model_summary(
             y_coord = dif
         ax[3][4].text(
             index[e],
-            y_coord + 0.03,
+            y_coord*1.05,
             f"{dif:.3f}",
             ha="center",
             va="bottom",
@@ -408,6 +413,8 @@ def make_model_summary(
             np.unique(prediction_secondary[i], return_counts=True)
         )
         residue_bias = pred[1] / sum(pred[1]) - seq[1] / sum(seq[1])
+        if max(residue_bias)>max_bias:
+            max_bias=max(residue_bias)
         ax[3][i].bar(x=index, height=residue_bias, width=0.8, align="center")
         ax[3][i].set_xticks(index)
         ax[3][i].set_xticklabels(
@@ -424,7 +431,7 @@ def make_model_summary(
                 y_coord = dif
             ax[3][i].text(
                 index[e],
-                y_coord + 0.03,
+                y_coord*1.05,
                 f"{dif:.3f}",
                 ha="center",
                 va="bottom",
@@ -444,6 +451,10 @@ def make_model_summary(
         ax[4][i].set_yticklabels(config.acids)
         # Plot Color Bar:
         fig.colorbar(im, ax=ax[4][i], fraction=0.046)
+    
+    #scale all bias plots so that they have the same y-axis.
+    for i in range(5):
+        ax[3][i].set_ylim(ymax=max_bias*1.1)
 
     # show accuracy,recall,similarity, precision and top3
     index = np.array([0, 1, 2, 3, 4])
@@ -454,27 +465,38 @@ def make_model_summary(
     # show accuracy
     ax[0][0].bar(x=index, height=accuracy, width=0.8, align="center")
 
-    # show top three accuracy
-    ax[0][0].scatter(x=index, y=top_three, marker="_", s=50, color="blue")
-    ax[0][0].vlines(x=index, ymin=0, ymax=top_three, linewidth=2)
     # show recall
     ax[0][1].bar(x=index, height=recall, width=0.8, align="center")
     ax[0][3].bar(x=index, height=precision, width=0.8, align="center")
     ax[0][4].bar(x=index, height=similarity, width=0.8, align="center")
     # add values to the plot
-    for e, value in enumerate(accuracy):
-        ax[0][0].text(
-            index[e],
-            value + 0.3,
-            f"{value:.3f}",
-            ha="center",
-            va="bottom",
-            rotation="vertical",
-        )
+    # show top_3 accuracy if available
+    if not np.isnan(top_three[0]):
+        ax[0][0].scatter(x=index, y=top_three, marker="_", s=50, color="blue")
+        ax[0][0].vlines(x=index, ymin=0, ymax=top_three, linewidth=2)
+        for e, value in enumerate(accuracy):
+            ax[0][0].text(
+                index[e],
+                top_three[e]*1.05,
+                f"{value:.3f}",
+                ha="center",
+                va="bottom",
+                rotation="vertical",
+            )
+    else:
+        for e, value in enumerate(accuracy):
+            ax[0][0].text(
+                index[e],
+                value*1.05,
+                f"{value:.3f}",
+                ha="center",
+                va="bottom",
+                rotation="vertical",
+            )
     for e, value in enumerate(recall):
         ax[0][1].text(
             index[e],
-            value * 1.2,
+            value * 1.1,
             f"{value:.3f}",
             ha="center",
             va="bottom",
@@ -483,7 +505,7 @@ def make_model_summary(
     for e, value in enumerate(precision):
         ax[0][3].text(
             index[e],
-            value * 1.2,
+            value * 1.05,
             f"{value:.3f}",
             ha="center",
             va="bottom",
@@ -492,7 +514,7 @@ def make_model_summary(
     for e, value in enumerate(similarity):
         ax[0][4].text(
             index[e],
-            value * 1.2,
+            value * 1.05,
             f"{value:.3f}",
             ha="center",
             va="bottom",
@@ -501,7 +523,6 @@ def make_model_summary(
     # show difference
 
     difference = np.array(accuracy) - np.array(recall)
-    minimum = np.amin(difference)
     maximum = np.amax(difference)
     ax[0][2].bar(x=index, height=difference, width=0.8, align="center")
     for e, dif in enumerate(difference):
@@ -511,7 +532,7 @@ def make_model_summary(
             y_coord = dif
         ax[0][2].text(
             index[e],
-            y_coord + 0.01,
+            y_coord*1.05,
             f"{dif:.3f}",
             ha="center",
             va="bottom",
@@ -528,7 +549,7 @@ def make_model_summary(
     ax[0][0].set_ylim(0, 1)
     ax[0][0].set_xlim(-0.7, index[-1] + 1)
 
-    ax[0][1].set_ylabel("Average recall")
+    ax[0][1].set_ylabel("Macro-recall")
     ax[0][1].set_xticks(index)
     ax[0][1].set_xticklabels(
         ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
@@ -538,7 +559,7 @@ def make_model_summary(
     ax[0][1].set_ylim(0, 1)
     ax[0][1].set_xlim(-0.7, index[-1] + 1)
 
-    ax[0][2].set_ylabel("Accuracy-Average recall")
+    ax[0][2].set_ylabel("Accuracy-Macro-recalls")
     ax[0][2].set_xticks(index)
     ax[0][2].set_xticklabels(
         ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
@@ -547,7 +568,7 @@ def make_model_summary(
     )
     ax[0][2].set_xlim(-0.7, index[-1] + 1)
     ax[0][2].axhline(0, -0.3, index[-1] + 1, color="k", lw=1)
-    ax[0][2].set_ylim(minimum * 1.2, maximum * 1.2)
+    ax[0][2].set_ylim(ymax=maximum * 1.2)
 
     ax[0][3].set_ylabel("Average precision")
     ax[0][3].set_xticks(index)
@@ -590,7 +611,7 @@ def make_model_summary(
     ax[1][3].set_title(f"Pearson correlation: {corr[0][2]:.3f}")
     ax[1][4].scatter(resolution, recall, color=class_color, alpha=0.7)
     ax[1][4].set_title(f"Pearson correlation: {corr[0][1]:.3f}")
-    ax[1][4].set_ylabel("Average recall")
+    ax[1][4].set_ylabel("Macro-recalls")
     ax[1][4].set_xlabel("Resolution, A")
     # make a legend
     patches = [
@@ -818,9 +839,9 @@ def compare_model_accuracy(
         ax[2][i].set_title(config.classes[i + 1], fontdict={"size": 22})
         ax[3][i].set_title(config.classes[i + 1], fontdict={"size": 22})
         ax[0][i].set_ylabel("Accuracy")
-        ax[1][i].set_ylabel("AverageRecall")
+        ax[1][i].set_ylabel("Macro-recall")
         ax[2][i].set_ylabel("Similarity")
-        ax[3][i].set_ylabel("Accuracy-AverageRecall")
+        ax[3][i].set_ylabel("Accuracy-MacroRecall")
         ax[0][i].set_xticks(index)
         ax[0][i].set_xticklabels(
             frame.loc[class_key[i]].name,
@@ -977,7 +998,7 @@ def compare_model_accuracy(
         # leave some space from the sides to make it look nicer.
         ax_secondary[0][0].set_xlim(-0.3, 5)
 
-        ax_secondary[0][1].set_ylabel("Average Recall")
+        ax_secondary[0][1].set_ylabel("Macro-recalls")
         ax_secondary[0][1].set_xticks([0, 1, 2, 3, 4])
         ax_secondary[0][1].set_xticklabels(
             ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
@@ -997,7 +1018,7 @@ def compare_model_accuracy(
         ax_secondary[1][1].set_ylim(0, 1)
         ax_secondary[1][1].set_xlim(-0.3, 5)
 
-        ax_secondary[1][0].set_ylabel("Accuracy-Average Recall")
+        ax_secondary[1][0].set_ylabel("Accuracy-Macro-recalls")
         ax_secondary[1][0].set_xticks([0, 1, 2, 3, 4])
         ax_secondary[1][0].set_xticklabels(
             ["All structures", "Helices", "Sheets", "Structured loops", "Random"],

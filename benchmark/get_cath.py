@@ -558,6 +558,7 @@ def format_sequence(
     true_secondary = [[], [], [], []]
     prediction_secondary = [[], [], [], []]
     # combine secondary structures for simplicity.
+    assert len(dssp)==len(sequence) and len(dssp)==len(prediction), 'format_sequence failed; dssp, sequence and prediction have different lengths.'
     for structure, truth, pred in zip(dssp, sequence, prediction):
         if structure == "H" or structure == "I" or structure == "G":
             true_secondary[0].append(truth)
@@ -628,6 +629,7 @@ def score(
             sequence, most_likely_seq, average="macro", zero_division=0
         )
     )
+    assert len(sequence)==len(most_likely_seq)
     similarity_score = [
         1 if lookup_blosum62(a, b) > 0 else 0
         for a, b in zip(sequence, most_likely_seq)
@@ -669,6 +671,7 @@ def score(
                     zero_division=0,
                 )
             )
+            assert len(true_secondary[seq_type])==len(secondary_sequence)
             similarity_score = [
                 1 if lookup_blosum62(a, b) > 0 else 0
                 for a, b in zip(true_secondary[seq_type], secondary_sequence)
@@ -725,6 +728,7 @@ def score_by_architecture(
     classes = df.drop_duplicates(subset=["class", "architecture"])["class"].values
     scores = []
     names = []
+    assert len(classes)==len(architectures)
     for cls, arch in zip(classes, architectures):
         accuracy, top_three, similarity, recall, precision = score(
             get_pdbs(df, cls, arch),
@@ -948,7 +952,7 @@ def format_angle_sequence(
             protein_angle = get_angles(protein, path_to_assemblies)
 
             # remove uncommon acids
-            if ignore_uncommon and protein.uncommon_index != []:
+            if ignore_uncommon and type(protein.uncommon_index)==list:
                 protein_sequence = "".join(
                     [
                         x
