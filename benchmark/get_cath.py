@@ -19,10 +19,25 @@ from benchmark import visualization
 from typing import Tuple, List, Iterable
 import warnings
 from sklearn.preprocessing import LabelBinarizer
+import wget
+import click
 
-
+def download_data(out_dir: Path) -> None:
+    """Download CATH file.
+    
+    Parameters
+    ----------
+    out_dir: Path:
+        Directory where to store the file."""
+    if click.confirm(
+            f"CATH file does not exist. It will be downloaded to {out_dir.resolve()}. Continue? "
+        ):
+         wget.download('ftp://orengoftp.biochem.ucl.ac.uk/cath/releases/latest-release/cath-classification-data/cath-domain-description-file.txt', out=str(out_dir))
+    else:
+        exit()
+   
 def read_data(CATH_file: str) -> pd.DataFrame:
-    """If CATH .csv exists, loads the DataFrame. If CATH .txt exists, makes DataFrame and saves it. The file should be in the same directory as this script.
+    """If CATH .csv exists, loads the DataFrame. If CATH .txt exists, makes DataFrame and saves it. If file doesn't exist, downloads it.
 
     Parameters
     ----------
@@ -34,6 +49,9 @@ def read_data(CATH_file: str) -> pd.DataFrame:
     df:pd.DataFrame
         DataFrame containing CATH and PDB codes."""
     path = Path(CATH_file)
+    #download if doesn't exist.
+    if not path.exists():
+        download_data(path.parent)
     # load .csv if exists, faster than reading .txt
     if path.with_suffix(".csv").exists():
         df = pd.read_csv(path.with_suffix(".csv"), index_col=0)
@@ -46,7 +64,6 @@ def read_data(CATH_file: str) -> pd.DataFrame:
         cath_info = []
         temp = []
         start_stop = []
-        # ftp://orengoftp.biochem.ucl.ac.uk/cath/releases/latest-release/cath-classification-data/
         with open(path) as file:
             for line in file:
                 if line[:6] == "DOMAIN":
