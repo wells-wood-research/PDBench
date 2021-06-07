@@ -602,16 +602,23 @@ def make_model_summary(
         by_fragment=True,
     )
     resolution = get_cath.get_resolution(df, path_to_pdb)
+    
     # calculate Pearson correlation between accuracy/recall and resolution.
-    corr = pd.DataFrame({0: resolution, 1: recall, 2: accuracy}).corr().to_numpy()
+    res_df = pd.DataFrame({'res': resolution, 'recall': recall, 'accuracy': accuracy}).dropna()
+    corr=res_df.corr().to_numpy()
+    #linear fit
+    m, b = np.polyfit(res_df['res'], res_df['accuracy'], 1)
+    ax[1][3].plot(res_df['res'], m*res_df['res'] + b, color='r')
     ax[1][3].scatter(resolution, accuracy, color=class_color, alpha=0.7)
     # Title, label, ticks and limits
     ax[1][3].set_xlabel("Resolution, A")
     ax[1][3].set_ylabel("Accuracy")
     ax[1][3].set_title(f"Pearson correlation: {corr[0][2]:.3f}")
+    m, b = np.polyfit(res_df['res'], res_df['recall'], 1)
+    ax[1][4].plot(res_df['res'], m*res_df['res'] + b, color='r')
     ax[1][4].scatter(resolution, recall, color=class_color, alpha=0.7)
     ax[1][4].set_title(f"Pearson correlation: {corr[0][1]:.3f}")
-    ax[1][4].set_ylabel("Macro-recalls")
+    ax[1][4].set_ylabel("Macro-recall")
     ax[1][4].set_xlabel("Resolution, A")
     # make a legend
     patches = [
@@ -666,7 +673,8 @@ def make_model_summary(
 
     plt.suptitle(name, fontsize="xx-large")
     fig.tight_layout(rect=[0, 0.03, 1, 0.98])
-    fig.savefig(name + ".pdf")
+    #fig.savefig(name + ".pdf")
+    fig.savefig(name + ".svg")
     plt.close()
 
 
