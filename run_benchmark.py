@@ -125,7 +125,7 @@ def compare_models(
     if include:
         with open(include) as file:
             models_to_include = [x.strip("\n") for x in file.readlines()]
-    df = get_cath.read_data(f"{os.path.dirname(sys.argv[0])}/cath-domain-description-file.txt")
+    df = get_cath.read_data(f"{Path(os.path.dirname(sys.argv[0]))/'cath-domain-description-file.txt'}")
     filtered_df = get_cath.filter_with_user_list(df, dataset)
     df_with_sequence = get_cath.append_sequence(
         filtered_df, Path(path_to_pdb)

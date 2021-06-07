@@ -52,5 +52,5 @@ def test_command_line():
     os.system(f'python ../run_benchmark.py --dataset test_set.txt --path_to_pdb {PATH_TO_PDB} --path_to_models ./ --training_set ~/project/sequence-recovery-benchmark/new_models_validation/trainingset.txt')
     
 if __name__=='__main__':
-  #test_load_CATH()
+  test_load_CATH()
   test_command_line()
