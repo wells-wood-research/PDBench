@@ -16,6 +16,7 @@ import matplotlib.backends.backend_pdf
 from scipy.stats import entropy
 from typing import List
 from benchmark import version
+from scipy.stats import pearsonr
 
 def _annotate_ampalobj_with_data_tag(
     ampal_structure,
@@ -601,31 +602,35 @@ def make_model_summary(
         ignore_uncommon=ignore_uncommon,
         by_fragment=True,
     )
+    #this is [nan,nan,...] if NMR.
     resolution = get_cath.get_resolution(df, path_to_pdb)
+    #NMR does not have resolution, full NMR set would crash np.polyfit.
+    if not np.isnan(resolution).all():
     
-    # calculate Pearson correlation between accuracy/recall and resolution.
-    res_df = pd.DataFrame({'res': resolution, 'recall': recall, 'accuracy': accuracy}).dropna()
-    corr=res_df.corr().to_numpy()
-    #linear fit
-    m, b = np.polyfit(res_df['res'], res_df['accuracy'], 1)
-    ax[1][3].plot(res_df['res'], m*res_df['res'] + b, color='r')
-    ax[1][3].scatter(resolution, accuracy, color=class_color, alpha=0.7)
-    # Title, label, ticks and limits
-    ax[1][3].set_xlabel("Resolution, A")
-    ax[1][3].set_ylabel("Accuracy")
-    ax[1][3].set_title(f"Pearson correlation: {corr[0][2]:.3f}")
-    m, b = np.polyfit(res_df['res'], res_df['recall'], 1)
-    ax[1][4].plot(res_df['res'], m*res_df['res'] + b, color='r')
-    ax[1][4].scatter(resolution, recall, color=class_color, alpha=0.7)
-    ax[1][4].set_title(f"Pearson correlation: {corr[0][1]:.3f}")
-    ax[1][4].set_ylabel("Macro-recall")
-    ax[1][4].set_xlabel("Resolution, A")
-    # make a legend
-    patches = [
-        mpatches.Patch(color=colors[x], label=config.classes[x]) for x in config.classes
-    ]
-    ax[1][4].legend(loc=1, handles=patches, prop={"size": 9})
-    ax[1][3].legend(loc=1, handles=patches, prop={"size": 9})
+        # calculate Pearson correlation between accuracy/recall and resolution.
+        res_df = pd.DataFrame({'res': resolution, 'recall': recall, 'accuracy': accuracy}).dropna()
+        corr=res_df.corr().to_numpy()
+        #linear fit
+        m, b = np.polyfit(res_df['res'], res_df['accuracy'], 1)
+        ax[1][3].plot(res_df['res'], m*res_df['res'] + b, color='r')
+        ax[1][3].scatter(resolution, accuracy, color=class_color, alpha=0.7)
+        # Title, label, ticks and limits
+        ax[1][3].set_xlabel("Resolution, A")
+        ax[1][3].set_ylabel("Accuracy")
+        ax[1][3].set_title(f"Pearson correlation: {corr[0][2]:.3f}")
+        m, b = np.polyfit(res_df['res'], res_df['recall'], 1)
+        ax[1][4].plot(res_df['res'], m*res_df['res'] + b, color='r')
+        ax[1][4].scatter(resolution, recall, color=class_color, alpha=0.7)
+        ax[1][4].set_title(f"Pearson correlation: {corr[0][1]:.3f}")
+        ax[1][4].set_ylabel("Macro-recall")
+        ax[1][4].set_xlabel("Resolution, A")
+        # make a legend
+        patches = [
+            mpatches.Patch(color=colors[x], label=config.classes[x]) for x in config.classes
+        ]
+        ax[1][4].legend(loc=1, handles=patches, prop={"size": 9})
+        ax[1][3].legend(loc=1, handles=patches, prop={"size": 9})
+        
     # show per residue metrics about the model
     gs = ax[0, 0].get_gridspec()
     # show per residue entropy
@@ -673,8 +678,8 @@ def make_model_summary(
 
     plt.suptitle(name, fontsize="xx-large")
     fig.tight_layout(rect=[0, 0.03, 1, 0.98])
-    #fig.savefig(name + ".pdf")
-    fig.savefig(name + ".svg")
+    fig.savefig(name + ".pdf")
+    #fig.savefig(name + ".svg")
     plt.close()
 
 
@@ -713,6 +718,7 @@ def compare_model_accuracy(
                 by_fragment=True,
             )
         )
+    
     # Plot CATH architectures
     minimum = 0
     maximum = 0
@@ -733,44 +739,72 @@ def compare_model_accuracy(
         squeeze=False,
     )
     plt.figtext(0.1, 0.99,s='Version: '+version.__version__,figure=fig,fontdict={"size": 12})
-
+    width=0.8/len(models)
     for i in range(len(class_key)):
         index = np.arange(0, models[0].loc[class_key[i]].shape[0])
         for j, frame in enumerate(models):
             value_accuracy = frame.loc[class_key[i]].accuracy.values
             value_recall = frame.loc[class_key[i]].recall.values
             value_similarity = frame.loc[class_key[i]].similarity.values
+            value_top3=frame.loc[class_key[i]].top3_accuracy.values
             # show accuracy
             ax[0][i].bar(
-                x=index + j * 0.1,
+                x=index + j * width,
                 height=value_accuracy,
-                width=0.1,
+                width=width,
                 align="center",
                 color=colors[j],
                 label=model_labels[j],
             )
-            for e, accuracy in enumerate(value_accuracy):
-                ax[0][i].text(
-                    index[e] + j * 0.1,
-                    accuracy + 0.3,
-                    f"{accuracy:.3f}",
-                    ha="center",
-                    va="bottom",
-                    rotation="vertical",
-                    fontdict={"size": 7},
+            # show top3 accuracy if it exists
+            if not np.isnan(value_top3[0]):
+                ax[0][i].scatter(
+                    x=index + j * width,
+                    y=value_top3,
+                    marker="_",
+                    s=50,
+                    color=colors[j],
                 )
+                ax[0][i].vlines(
+                    x=index + j * width,
+                    ymin=0,
+                    ymax=value_top3,
+                    color=colors[j],
+                    linewidth=2,
+                )
+                for e, accuracy in enumerate(value_accuracy):
+                    ax[0][i].text(
+                        index[e] + j * width,
+                        value_top3[e] + 0.01,
+                        f"{accuracy:.3f}",
+                        ha="center",
+                        va="bottom",
+                        rotation="vertical",
+                        fontdict={"size": 7},
+                    )
+            else:
+                for e, accuracy in enumerate(value_accuracy):
+                    ax[0][i].text(
+                        index[e] + j * width,
+                        accuracy + 0.01,
+                        f"{accuracy:.3f}",
+                        ha="center",
+                        va="bottom",
+                        rotation="vertical",
+                        fontdict={"size": 7},
+                    )
             # show recall
             ax[1][i].bar(
-                x=index + j * 0.1,
+                x=index + j * width,
                 height=value_recall,
-                width=0.1,
+                width=width,
                 align="center",
                 color=colors[j],
             )
             for e, recall in enumerate(value_recall):
                 ax[1][i].text(
-                    index[e] + j * 0.1,
-                    recall * 1.2,
+                    index[e] + j * width,
+                    recall+0.01,
                     f"{recall:.3f}",
                     ha="center",
                     va="bottom",
@@ -778,35 +812,20 @@ def compare_model_accuracy(
                     fontdict={"size": 7},
                 )
 
-            # show top3 accuracy if it exists
-            if "top3_accuracy" in frame:
-                value_top_three = frame.loc[class_key[i]].top3_accuracy.values
-                ax[0][i].scatter(
-                    x=index + j * 0.1,
-                    y=value_top_three,
-                    marker="_",
-                    s=50,
-                    color=colors[j],
-                )
-                ax[0][i].vlines(
-                    x=index + j * 0.1,
-                    ymin=0,
-                    ymax=value_top_three,
-                    color=colors[j],
-                    linewidth=2,
-                )
+        
+            
             # show similarity scores
             ax[2][i].bar(
-                x=index + j * 0.1,
+                x=index + j * width,
                 height=value_similarity,
-                width=0.1,
+                width=width,
                 align="center",
                 color=colors[j],
             )
             for e, similarity in enumerate(value_similarity):
                 ax[2][i].text(
-                    index[e] + j * 0.1,
-                    similarity * 1.2,
+                    index[e] + j * width,
+                    similarity+0.01,
                     f"{similarity:.3f}",
                     ha="center",
                     va="bottom",
@@ -820,9 +839,9 @@ def compare_model_accuracy(
             if np.amax(difference) > maximum:
                 maximum = np.amax(difference)
             ax[3][i].bar(
-                x=index + j * 0.1,
+                x=index + j * width,
                 height=difference,
-                width=0.1,
+                width=width,
                 align="center",
                 color=colors[j],
             )
@@ -832,7 +851,7 @@ def compare_model_accuracy(
                 else:
                     y_coord = dif
                 ax[3][i].text(
-                    index[e] + j * 0.1,
+                    index[e] + j * width,
                     y_coord + 0.01,
                     f"{dif:.3f}",
                     ha="center",
@@ -895,7 +914,7 @@ def compare_model_accuracy(
     # Plot secondary structures
     maximum = 0
     minimum = 0
-    fig_secondary, ax_secondary = plt.subplots(2, 2, figsize=(12 * len(class_key), 10))
+    fig_secondary, ax_secondary = plt.subplots(2, 2, figsize=(24,12))
     index = np.array([0, 1, 2, 3, 4])
     for j, model in enumerate(model_scores):
         accuracy, top_three, similarity, recall, precision = get_cath.score(
@@ -903,68 +922,82 @@ def compare_model_accuracy(
         )
         # show accuracy
         ax_secondary[0][0].bar(
-            x=index + j * 0.1,
+            x=index + j * width,
             height=accuracy,
-            width=0.1,
+            width=width,
             align="center",
             color=colors[j],
             label=model_labels[j],
         )
-        # show top three accuracy
-        ax_secondary[0][0].scatter(
-            x=index + j * 0.1, y=top_three, marker="_", s=50, color=colors[j]
-        )
-        ax_secondary[0][0].vlines(
-            x=index + j * 0.1, ymin=0, ymax=top_three, color=colors[j], linewidth=2
-        )
+
         # show recall
         ax_secondary[0][1].bar(
-            x=index + j * 0.1,
+            x=index + j * width,
             height=recall,
-            width=0.1,
+            width=width,
             align="center",
             color=colors[j],
             label=model_labels[j],
         )
         # show similarity score
         ax_secondary[1][1].bar(
-            x=index + j * 0.1,
+            x=index + j * width,
             height=similarity,
-            width=0.1,
+            width=width,
             align="center",
             color=colors[j],
             label=model_labels[j],
         )
-        # add values to the plot
-        for e, value in enumerate(accuracy):
-            ax_secondary[0][0].text(
-                index[e] + j * 0.1,
-                value + 0.3,
-                f"{value:.3f}",
-                ha="center",
-                va="bottom",
-                rotation="vertical",
-                fontdict={"size": 6},
+        # show top three accuracy if exists
+        if not np.isnan(top_three[0]):
+            ax_secondary[0][0].scatter(
+                x=index + j * width, y=top_three, marker="_", s=50, color=colors[j]
             )
+            ax_secondary[0][0].vlines(
+                x=index + j * width, ymin=0, ymax=top_three, color=colors[j], linewidth=2
+            )
+            # add accuracy values to the plot
+            for e, value in enumerate(accuracy):
+                ax_secondary[0][0].text(
+                    index[e] + j * width,
+                    top_three[e] + 0.01,
+                    f"{value:.3f}",
+                    ha="center",
+                    va="bottom",
+                    rotation="vertical",
+                    fontdict={"size": 12},
+                )
+        else:
+            for e, value in enumerate(accuracy):
+                ax_secondary[0][0].text(
+                    index[e] + j * width,
+                    value + 0.01,
+                    f"{value:.3f}",
+                    ha="center",
+                    va="bottom",
+                    rotation="vertical",
+                    fontdict={"size": 12},
+                )
+        #add other values to the plots       
         for e, value in enumerate(recall):
             ax_secondary[0][1].text(
-                index[e] + j * 0.1,
-                value * 1.2,
+                index[e] + j * width,
+                value+0.01,
                 f"{value:.3f}",
                 ha="center",
                 va="bottom",
                 rotation="vertical",
-                fontdict={"size": 6},
+                fontdict={"size": 12},
             )
         for e, value in enumerate(similarity):
             ax_secondary[1][1].text(
-                index[e] + j * 0.1,
-                value * 1.2,
+                index[e] + j * width,
+                value+0.01,
                 f"{value:.3f}",
                 ha="center",
                 va="bottom",
                 rotation="vertical",
-                fontdict={"size": 6},
+                fontdict={"size": 12},
             )
         # show difference
         difference = np.array(accuracy) - np.array(recall)
@@ -973,9 +1006,9 @@ def compare_model_accuracy(
         if np.amax(difference) > maximum:
             maximum = np.amax(difference)
         ax_secondary[1][0].bar(
-            x=index + j * 0.1,
+            x=index + j * width,
             height=difference,
-            width=0.1,
+            width=width,
             align="center",
             color=colors[j],
         )
@@ -985,13 +1018,13 @@ def compare_model_accuracy(
             else:
                 y_coord = dif
             ax_secondary[1][0].text(
-                e + j * 0.1,
+                e + j * width,
                 y_coord + 0.01,
                 f"{dif:.3f}",
                 ha="center",
                 va="bottom",
                 rotation="vertical",
-                fontdict={"size": 6},
+                fontdict={"size": 12},
             )
         # Title, labels, ticks and limits
         fig_secondary.suptitle("Secondary structure", fontdict={"size": 22})
@@ -1036,12 +1069,34 @@ def compare_model_accuracy(
         ax_secondary[1][0].set_xlim(-0.3, 5)
         ax_secondary[1][0].axhline(0, -0.3, index[-1] + 1, color="k", lw=1)
         # make y axis in difference plots equal to get nicer graphs.
-        ax_secondary[1][0].set_ylim(minimum * 1.2, maximum * 1.2)
+        ax_secondary[1][0].set_ylim(ymax=maximum * 1.2)
     fig_secondary.tight_layout()
+    
+    fig_corr,ax_corr=plt.subplots()
+    #plot covarience between models
+    cov=pd.concat([x['accuracy'] for x in models], axis=1)
+    corr=cov.corr().to_numpy()
+    im = ax_corr.imshow(corr)
+    ax_corr.set_yticks(range(len(models)))
+    ax_corr.set_yticklabels(model_labels)
+    ax_corr.set_xticks(range(len(models)))
+    ax_corr.set_xticklabels(model_labels)
+    fig_corr.colorbar(im, ax=ax_corr, fraction=0.046)
+    #add text
+    for i in range(len(models)):
+        for j in range(len(models)):
+            text = ax_corr.text(j, i, f"{corr[i, j]:.2f}",ha="center", va="center", color="w")
+    fig_corr.tight_layout()
+   
 
     pdf = matplotlib.backends.backend_pdf.PdfPages(location / "Comparison_summary.pdf")
+    
     pdf.savefig(fig)
     pdf.savefig(fig_secondary)
+    pdf.savefig(fig_corr)
+    #fig_corr.savefig(location/'correlation.svg')
+    #fig_secondary.savefig(location/'secondary_comparison.svg')
+    #fig.savefig(location/'comparison.svg')
     pdf.close()
     plt.close()
     

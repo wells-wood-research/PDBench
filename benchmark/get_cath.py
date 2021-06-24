@@ -297,11 +297,12 @@ def get_resolution(df: pd.DataFrame, path_to_pdb: Path) -> List[float]:
             with gzip.open(path, "rb") as pdb:
                 pdb_text = pdb.read().decode()
             item = re.findall("REMARK   2 RESOLUTION.*$", pdb_text, re.MULTILINE)
-            #nmr structures have no resolution
+            
             if item[0].split()[3]!='NOT':
                 res.append(float(item[0].split()[3]))
+            #nmr structures have no resolution
             else:
-                res.append(0.0)
+                res.append(np.NaN)
         else:
             res.append(np.NaN)
     return res
