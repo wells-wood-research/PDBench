@@ -45,7 +45,7 @@ Accuracy-based metrics are useful, but there is functional redundancy between am
 
 <img src="https://user-images.githubusercontent.com/77202997/138561002-0ab8be86-3265-447a-88ce-bfada2f6f66d.png">
 
-**3.** F1 score for amino acids shows that small hydrophobic amino acids such as leucine or glycine are predicted very accurately while hydrophylic amino acids are predicted less accurately. This trend holds for physics-based and DNN models.
+**3.** F1 score for amino acids shows that hydrophobic amino acids such as leucine or glycine are predicted very accurately while hydrophylic amino acids are predicted less accurately. This trend holds for physics-based and DNN models.
 ![F1_score](https://user-images.githubusercontent.com/77202997/138563139-61bcfc78-f720-4bb2-8b6d-1d6d16e69ef0.png)
 
 
