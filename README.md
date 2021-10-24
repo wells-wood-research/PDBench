@@ -47,6 +47,8 @@ We calculate four groups of metrics:
 
 All metrics except similarity and prediction bias are calculated with SciKit-Learn (see [here](https://scikit-learn.org/stable/modules/model_evaluation.html#classification-metrics) for more info about the metrics). Prediction bias is a metric measuring the discrepancy between the occurrence of a residue and the number of times it is predicted.
 
+We use macro-averaged metrics to cap the performance per amino acid thus avoiding models predicting the most common amino acids (eg. Leucine) to obtain high performance through over-prediction.
+
 Accuracy-based metrics are useful, but there is functional redundancy between amino acids, as many side chains have similar chemistry. The similarity of amino acids can be determined by the relative frequency of substitution of one amino acid for another observed in natural structures, using substitution matrices such as BLOSUM62, which we combine into a similarity score for the sequence.
 
 ### Examples
