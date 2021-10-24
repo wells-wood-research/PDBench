@@ -26,7 +26,7 @@ Crystal structures with <3Å resolution and up to 90% sequence identity were car
 To evaluate models in my_models directory using PDB structures listed in benchmark_set.txt:
 
 1. Generate predictions and format them as a **N x 20**  matrix where **N** is the number of amino acids in the polypeptide chain. Each row in the matrix encodes prediction probabilities across the 20 canonical amino-acid classes. 
-2. Concatenate all predicions and save them as CSV file.
+2. Concatenate all predictions and save them as CSV file.
 3. For each model, generate a dataset map with the list of PDB codes and sequence lengths of structures in CSV file.
 4. Run:
 ```sh
@@ -59,12 +59,12 @@ Accuracy-based metrics are useful, but there is functional redundancy between am
 
 <img src="https://user-images.githubusercontent.com/77202997/138561002-0ab8be86-3265-447a-88ce-bfada2f6f66d.png">
 
-**3.** F1 score for amino acids shows that hydrophobic amino acids such as leucine or glycine are predicted very accurately while hydrophylic amino acids are predicted less accurately. This trend holds for physics-based and DNN models.
+**3.** F1 score for amino acids shows that hydrophobic amino acids such as leucine or glycine are predicted very accurately while hydrophilic amino acids are predicted less accurately. This trend holds for physics-based and DNN models.
 ![F1_score](https://user-images.githubusercontent.com/77202997/138563139-61bcfc78-f720-4bb2-8b6d-1d6d16e69ef0.png)
 
 
 
-For more in-depth analysis, see our [paper](https://arxiv.org/abs/2109.07925). To see all the other metrics produced for different models, for all secondary strucutre types and all 40 protein architectures, go to **/examples**.
+For more in-depth analysis, see our [paper](https://arxiv.org/abs/2109.07925). To see all the other metrics produced for different models, for all secondary structure types and all 40 protein architectures, go to **/examples**.
 
 ## Optional features
 ```sh
