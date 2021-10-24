@@ -1,3 +1,5 @@
+wget
+Cython
 numpy==1.19.5
 pandas==1.2.0
 AMPAL==1.4.0

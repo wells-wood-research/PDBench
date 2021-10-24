@@ -1,5 +1,5 @@
 ignore_uncommon False
-include_pdbs 
+include_pdbs 1a41
 ##########
 1a41A 221
 1a92A 50

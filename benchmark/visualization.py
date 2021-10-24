@@ -478,7 +478,7 @@ def make_model_summary(
         for e, value in enumerate(accuracy):
             ax[0][0].text(
                 index[e],
-                top_three[e]*1.05,
+                top_three[e]+0.01,
                 f"{value:.3f}",
                 ha="center",
                 va="bottom",
@@ -488,7 +488,7 @@ def make_model_summary(
         for e, value in enumerate(accuracy):
             ax[0][0].text(
                 index[e],
-                value*1.05,
+                value+0.01,
                 f"{value:.3f}",
                 ha="center",
                 va="bottom",
@@ -497,7 +497,7 @@ def make_model_summary(
     for e, value in enumerate(recall):
         ax[0][1].text(
             index[e],
-            value * 1.1,
+            value+0.01,
             f"{value:.3f}",
             ha="center",
             va="bottom",
@@ -515,7 +515,7 @@ def make_model_summary(
     for e, value in enumerate(similarity):
         ax[0][4].text(
             index[e],
-            value * 1.05,
+            value+0.01,
             f"{value:.3f}",
             ha="center",
             va="bottom",
@@ -533,7 +533,7 @@ def make_model_summary(
             y_coord = dif
         ax[0][2].text(
             index[e],
-            y_coord*1.05,
+            y_coord+0.01,
             f"{dif:.3f}",
             ha="center",
             va="bottom",
@@ -550,7 +550,7 @@ def make_model_summary(
     ax[0][0].set_ylim(0, 1)
     ax[0][0].set_xlim(-0.7, index[-1] + 1)
 
-    ax[0][1].set_ylabel("Macro-recall")
+    ax[0][1].set_ylabel("MacroRecall")
     ax[0][1].set_xticks(index)
     ax[0][1].set_xticklabels(
         ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
@@ -560,7 +560,7 @@ def make_model_summary(
     ax[0][1].set_ylim(0, 1)
     ax[0][1].set_xlim(-0.7, index[-1] + 1)
 
-    ax[0][2].set_ylabel("Accuracy-Macro-recalls")
+    ax[0][2].set_ylabel("Accuracy-MacroRecall")
     ax[0][2].set_xticks(index)
     ax[0][2].set_xticklabels(
         ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
@@ -571,7 +571,7 @@ def make_model_summary(
     ax[0][2].axhline(0, -0.3, index[-1] + 1, color="k", lw=1)
     ax[0][2].set_ylim(ymax=maximum * 1.2)
 
-    ax[0][3].set_ylabel("Average precision")
+    ax[0][3].set_ylabel("MacroPrecision")
     ax[0][3].set_xticks(index)
     ax[0][3].set_xticklabels(
         ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
@@ -622,7 +622,7 @@ def make_model_summary(
         ax[1][4].plot(res_df['res'], m*res_df['res'] + b, color='r')
         ax[1][4].scatter(resolution, recall, color=class_color, alpha=0.7)
         ax[1][4].set_title(f"Pearson correlation: {corr[0][1]:.3f}")
-        ax[1][4].set_ylabel("Macro-recall")
+        ax[1][4].set_ylabel("MacroRecall")
         ax[1][4].set_xlabel("Resolution, A")
         # make a legend
         patches = [
@@ -670,6 +670,7 @@ def make_model_summary(
     ax[1][0].bar(by_residue_frame.index, by_residue_frame.auc)
     ax[1][0].set_ylabel("AUC")
     ax[1][0].set_xlabel("Amino acids")
+    ax[1][0].set_ylim(0, 1)
     #Remove empty subplots.
     ax[1][1].remove()
     ax[1][2].remove()
@@ -679,7 +680,6 @@ def make_model_summary(
     plt.suptitle(name, fontsize="xx-large")
     fig.tight_layout(rect=[0, 0.03, 1, 0.98])
     fig.savefig(name + ".pdf")
-    #fig.savefig(name + ".svg")
     plt.close()
 
 
@@ -709,6 +709,10 @@ def compare_model_accuracy(
         If True, ignores uncommon residues in accuracy calculations. Required for EvoEF2."""
 
     models = []
+    
+    #remove .csv extenstion from labels
+    model_labels=[x[:-4] for x in model_labels]
+    
     for model, ignore in zip(model_scores, ignore_uncommon):
         models.append(
             get_cath.score_by_architecture(
@@ -866,7 +870,7 @@ def compare_model_accuracy(
         ax[2][i].set_title(config.classes[i + 1], fontdict={"size": 22})
         ax[3][i].set_title(config.classes[i + 1], fontdict={"size": 22})
         ax[0][i].set_ylabel("Accuracy")
-        ax[1][i].set_ylabel("Macro-recall")
+        ax[1][i].set_ylabel("MacroRecall")
         ax[2][i].set_ylabel("Similarity")
         ax[3][i].set_ylabel("Accuracy-MacroRecall")
         ax[0][i].set_xticks(index)
@@ -905,7 +909,7 @@ def compare_model_accuracy(
     for x in range(len(ax[3])):
         ax[3][x].set_ylim(minimum * 1.2, maximum * 1.2)
     handles, labels = ax[0][0].get_legend_handles_labels()
-    ax[4][0].legend(handles, labels, loc=1, prop={"size": 12})
+    ax[4][0].legend(handles, labels, loc=1, prop={"size": 12},ncol=len(labels))
     ax[4][0].set_axis_off()
     for x in range(1, len(class_key)):
         ax[4][x].remove()
@@ -1039,7 +1043,7 @@ def compare_model_accuracy(
         # leave some space from the sides to make it look nicer.
         ax_secondary[0][0].set_xlim(-0.3, 5)
 
-        ax_secondary[0][1].set_ylabel("Macro-recalls")
+        ax_secondary[0][1].set_ylabel("MacroRecall")
         ax_secondary[0][1].set_xticks([0, 1, 2, 3, 4])
         ax_secondary[0][1].set_xticklabels(
             ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
@@ -1059,7 +1063,7 @@ def compare_model_accuracy(
         ax_secondary[1][1].set_ylim(0, 1)
         ax_secondary[1][1].set_xlim(-0.3, 5)
 
-        ax_secondary[1][0].set_ylabel("Accuracy-Macro-recalls")
+        ax_secondary[1][0].set_ylabel("Accuracy-MacroRecall")
         ax_secondary[1][0].set_xticks([0, 1, 2, 3, 4])
         ax_secondary[1][0].set_xticklabels(
             ["All structures", "Helices", "Sheets", "Structured loops", "Random"],
@@ -1072,31 +1076,26 @@ def compare_model_accuracy(
         ax_secondary[1][0].set_ylim(ymax=maximum * 1.2)
     fig_secondary.tight_layout()
     
-    fig_corr,ax_corr=plt.subplots()
+    fig_corr,ax_corr=plt.subplots(figsize=(8.27,8.27))
     #plot covarience between models
     cov=pd.concat([x['accuracy'] for x in models], axis=1)
     corr=cov.corr().to_numpy()
     im = ax_corr.imshow(corr)
     ax_corr.set_yticks(range(len(models)))
-    ax_corr.set_yticklabels(model_labels)
+    ax_corr.set_yticklabels(model_labels,)
     ax_corr.set_xticks(range(len(models)))
-    ax_corr.set_xticklabels(model_labels)
+    ax_corr.set_xticklabels(model_labels,rotation = 90) 
     fig_corr.colorbar(im, ax=ax_corr, fraction=0.046)
     #add text
     for i in range(len(models)):
         for j in range(len(models)):
             text = ax_corr.text(j, i, f"{corr[i, j]:.2f}",ha="center", va="center", color="w")
     fig_corr.tight_layout()
-   
-
     pdf = matplotlib.backends.backend_pdf.PdfPages(location / "Comparison_summary.pdf")
     
     pdf.savefig(fig)
     pdf.savefig(fig_secondary)
     pdf.savefig(fig_corr)
-    #fig_corr.savefig(location/'correlation.svg')
-    #fig_secondary.savefig(location/'secondary_comparison.svg')
-    #fig.savefig(location/'comparison.svg')
     pdf.close()
     plt.close()
     

@@ -4,10 +4,6 @@ import numpy as np
 import pandas as pd
 import ampal
 import gzip
-import glob
-import subprocess
-import multiprocessing
-import os
 from pathlib import Path
 from sklearn import metrics
 from benchmark import config
@@ -37,7 +33,7 @@ def download_data(out_dir: Path) -> None:
         exit()
    
 def read_data(CATH_file: str) -> pd.DataFrame:
-    """If CATH .csv exists, loads the DataFrame. If CATH .txt exists, makes DataFrame and saves it. If file doesn't exist, downloads it.
+    """If CATH .csv exists, loads the DataFrame. If CATH .txt exists, makes DataFrame and saves it. If CATH .txt file doesn't exist, downloads it.
 
     Parameters
     ----------
@@ -518,7 +514,7 @@ def format_sequence(
             stop = protein.stop
             predicted_sequence = predictions[protein.PDB + protein.chain]
             # remove uncommon acids
-            if ignore_uncommon and type(protein.uncommon_index)==list:
+            if ignore_uncommon and isinstance(protein.uncommon_index,list):
                 protein_sequence = "".join(
                     [
                         x
@@ -647,7 +643,7 @@ def score(
             sequence, most_likely_seq, average="macro", zero_division=0
         )
     )
-    assert len(sequence)==len(most_likely_seq)
+    assert len(sequence)==len(most_likely_seq), "Predicted and true sequence lengths do not match."
     similarity_score = [
         1 if lookup_blosum62(a, b) > 0 else 0
         for a, b in zip(sequence, most_likely_seq)
@@ -689,7 +685,7 @@ def score(
                     zero_division=0,
                 )
             )
-            assert len(true_secondary[seq_type])==len(secondary_sequence)
+            assert len(true_secondary[seq_type])==len(secondary_sequence), "True and predicted lengths do not match"
             similarity_score = [
                 1 if lookup_blosum62(a, b) > 0 else 0
                 for a, b in zip(true_secondary[seq_type], secondary_sequence)
@@ -746,7 +742,7 @@ def score_by_architecture(
     classes = df.drop_duplicates(subset=["class", "architecture"])["class"].values
     scores = []
     names = []
-    assert len(classes)==len(architectures)
+    assert len(classes)==len(architectures), "Number of entries in classes and architectures do not match, this is impossible."
     for cls, arch in zip(classes, architectures):
         accuracy, top_three, similarity, recall, precision = score(
             get_pdbs(df, cls, arch),
