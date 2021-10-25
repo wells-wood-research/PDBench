@@ -4,10 +4,6 @@ import numpy as np
 import pandas as pd
 import ampal
 import gzip
-import glob
-import subprocess
-import multiprocessing
-import os
 from pathlib import Path
 from sklearn import metrics
 from benchmark import config
@@ -19,10 +15,25 @@ from benchmark import visualization
 from typing import Tuple, List, Iterable
 import warnings
 from sklearn.preprocessing import LabelBinarizer
+import wget
+import click
 
-
+def download_data(out_dir: Path) -> None:
+    """Download CATH file.
+    
+    Parameters
+    ----------
+    out_dir: Path:
+        Directory where to store the file."""
+    if click.confirm(
+            f"CATH file does not exist. It will be downloaded to {out_dir.resolve()}. Continue? "
+        ):
+         wget.download('ftp://orengoftp.biochem.ucl.ac.uk/cath/releases/latest-release/cath-classification-data/cath-domain-description-file.txt', out=str(out_dir))
+    else:
+        exit()
+   
 def read_data(CATH_file: str) -> pd.DataFrame:
-    """If CATH .csv exists, loads the DataFrame. If CATH .txt exists, makes DataFrame and saves it. The file should be in the same directory as this script.
+    """If CATH .csv exists, loads the DataFrame. If CATH .txt exists, makes DataFrame and saves it. If CATH .txt file doesn't exist, downloads it.
 
     Parameters
     ----------
@@ -34,6 +45,9 @@ def read_data(CATH_file: str) -> pd.DataFrame:
     df:pd.DataFrame
         DataFrame containing CATH and PDB codes."""
     path = Path(CATH_file)
+    #download if doesn't exist.
+    if not path.exists():
+        download_data(path.parent)
     # load .csv if exists, faster than reading .txt
     if path.with_suffix(".csv").exists():
         df = pd.read_csv(path.with_suffix(".csv"), index_col=0)
@@ -46,7 +60,6 @@ def read_data(CATH_file: str) -> pd.DataFrame:
         cath_info = []
         temp = []
         start_stop = []
-        # ftp://orengoftp.biochem.ucl.ac.uk/cath/releases/latest-release/cath-classification-data/
         with open(path) as file:
             for line in file:
                 if line[:6] == "DOMAIN":
@@ -280,11 +293,12 @@ def get_resolution(df: pd.DataFrame, path_to_pdb: Path) -> List[float]:
             with gzip.open(path, "rb") as pdb:
                 pdb_text = pdb.read().decode()
             item = re.findall("REMARK   2 RESOLUTION.*$", pdb_text, re.MULTILINE)
-            #nmr structures have no resolution
+            
             if item[0].split()[3]!='NOT':
                 res.append(float(item[0].split()[3]))
+            #nmr structures have no resolution
             else:
-                res.append(0.0)
+                res.append(np.NaN)
         else:
             res.append(np.NaN)
     return res
@@ -500,7 +514,7 @@ def format_sequence(
             stop = protein.stop
             predicted_sequence = predictions[protein.PDB + protein.chain]
             # remove uncommon acids
-            if ignore_uncommon and type(protein.uncommon_index)==list:
+            if ignore_uncommon and isinstance(protein.uncommon_index,list):
                 protein_sequence = "".join(
                     [
                         x
@@ -558,6 +572,7 @@ def format_sequence(
     true_secondary = [[], [], [], []]
     prediction_secondary = [[], [], [], []]
     # combine secondary structures for simplicity.
+    assert len(dssp)==len(sequence) and len(dssp)==len(prediction), 'format_sequence failed; dssp, sequence and prediction have different lengths.'
     for structure, truth, pred in zip(dssp, sequence, prediction):
         if structure == "H" or structure == "I" or structure == "G":
             true_secondary[0].append(truth)
@@ -628,6 +643,7 @@ def score(
             sequence, most_likely_seq, average="macro", zero_division=0
         )
     )
+    assert len(sequence)==len(most_likely_seq), "Predicted and true sequence lengths do not match."
     similarity_score = [
         1 if lookup_blosum62(a, b) > 0 else 0
         for a, b in zip(sequence, most_likely_seq)
@@ -669,6 +685,7 @@ def score(
                     zero_division=0,
                 )
             )
+            assert len(true_secondary[seq_type])==len(secondary_sequence), "True and predicted lengths do not match"
             similarity_score = [
                 1 if lookup_blosum62(a, b) > 0 else 0
                 for a, b in zip(true_secondary[seq_type], secondary_sequence)
@@ -725,6 +742,7 @@ def score_by_architecture(
     classes = df.drop_duplicates(subset=["class", "architecture"])["class"].values
     scores = []
     names = []
+    assert len(classes)==len(architectures), "Number of entries in classes and architectures do not match, this is impossible."
     for cls, arch in zip(classes, architectures):
         accuracy, top_three, similarity, recall, precision = score(
             get_pdbs(df, cls, arch),
@@ -948,7 +966,7 @@ def format_angle_sequence(
             protein_angle = get_angles(protein, path_to_assemblies)
 
             # remove uncommon acids
-            if ignore_uncommon and protein.uncommon_index != []:
+            if ignore_uncommon and type(protein.uncommon_index)==list:
                 protein_sequence = "".join(
                     [
                         x
