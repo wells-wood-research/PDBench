@@ -563,6 +563,7 @@ include_pdbs
 5kxhA 350
 5lf2A 302
 5lw3A 381
+5m04A 337
 5m3qA 224
 5m5zA 755
 5m7yA 425
@@ -612,4 +613,4 @@ include_pdbs
 6mfkA 210
 6ms3B 511
 6nibA 345
-6nkjA 412
+6nkjA 421
