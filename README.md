@@ -53,9 +53,9 @@ Accuracy-based metrics are useful, but there is functional redundancy between am
 
 ### Examples
 
-**1.** We tested two state-of-the-art physics-based models: [Rosetta](https://www.nature.com/articles/s41592-020-0848-2) and [EvoEF2](https://pubmed.ncbi.nlm.nih.gov/31588495/), and three DNN models: [ProDCoNN](https://onlinelibrary.wiley.com/doi/full/10.1002/prot.25868), [DenseCPD](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00043) and TIMED.
+**1.** We tested two state-of-the-art physics-based models: [Rosetta](https://www.nature.com/articles/s41592-020-0848-2) and [EvoEF2](https://pubmed.ncbi.nlm.nih.gov/31588495/), and three DNN models: [ProDCoNN](https://onlinelibrary.wiley.com/doi/full/10.1002/prot.25868), [DenseCPD](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00043) and [TIMED](https://github.com/wells-wood-research/timed-design).
 
-![readme](https://user-images.githubusercontent.com/77202997/138560581-625d4fa8-cccc-420b-bca4-d6fb2a89104f.png)
+![readme](https://user-images.githubusercontent.com/17524568/162149140-e29614e5-6575-4118-9025-44eb31172f14.png)
 
 **2.** The composition of the amino acids in proteins is not uniformly distributed, and can vary significantly between different protein folds. Therefore, we investigated the effect of balancing amino acid distributions in the dataset prior to training.  When TIMED and ProDCoNN were trained without balancing, the prediction bias increased for the most common amino acids, while macro-recall decreased. This was extremely evident in α-helices.
 
