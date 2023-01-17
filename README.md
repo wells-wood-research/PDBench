@@ -53,9 +53,9 @@ Accuracy-based metrics are useful, but there is functional redundancy between am
 
 ### Examples
 
-**1.** We tested two state-of-the-art physics-based models: [Rosetta](https://www.nature.com/articles/s41592-020-0848-2) and [EvoEF2](https://pubmed.ncbi.nlm.nih.gov/31588495/), and three DNN models: [ProDCoNN](https://onlinelibrary.wiley.com/doi/full/10.1002/prot.25868), [DenseCPD](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00043) and TIMED.
+**1.** We tested two state-of-the-art physics-based models: [Rosetta](https://www.nature.com/articles/s41592-020-0848-2) and [EvoEF2](https://pubmed.ncbi.nlm.nih.gov/31588495/), and three DNN models: [ProDCoNN](https://onlinelibrary.wiley.com/doi/full/10.1002/prot.25868), [DenseCPD](https://pubs.acs.org/doi/10.1021/acs.jcim.0c00043) and [TIMED](https://github.com/wells-wood-research/timed-design).
 
-![readme](https://user-images.githubusercontent.com/77202997/138560581-625d4fa8-cccc-420b-bca4-d6fb2a89104f.png)
+![readme](https://user-images.githubusercontent.com/17524568/162149140-e29614e5-6575-4118-9025-44eb31172f14.png)
 
 **2.** The composition of the amino acids in proteins is not uniformly distributed, and can vary significantly between different protein folds. Therefore, we investigated the effect of balancing amino acid distributions in the dataset prior to training.  When TIMED and ProDCoNN were trained without balancing, the prediction bias increased for the most common amino acids, while macro-recall decreased. This was extremely evident in α-helices.
 
@@ -82,4 +82,19 @@ If your model skips non-canonical amino acids (e.g. EvoEF2), you can set ignore_
 
 <img src="https://user-images.githubusercontent.com/77202997/138557135-7a1441a8-f72d-45c6-9e57-503f23e30ca3.png" width="300" align="right" />If you want to visualize prediction accuracy and entropy on a particular protein chains, you can list them in the dataset map, e.g. ```include_pdbs 1a41A 1l2sB```. Open created PDB files with PyMol and show accuracy:```spectrum q, blue_white_red, maximum=6,minimum=-6```, entropy: ```cartoon putty```.
 
+## Cite This Work
 
+```
+@article{castorina_2023_pdbench,
+    author = {Castorina, Leonardo V and Petrenas, Rokas and Subr, Kartic and Wood, Christopher W},
+    title = "{PDBench: Evaluating Computational Methods for Protein-Sequence Design}",
+    journal = {Bioinformatics},
+    year = {2023},
+    month = {01},
+    issn = {1367-4811},
+    doi = {10.1093/bioinformatics/btad027},
+    url = {https://doi.org/10.1093/bioinformatics/btad027},
+    note = {btad027},
+    eprint = {https://academic.oup.com/bioinformatics/advance-article-pdf/doi/10.1093/bioinformatics/btad027/48691588/btad027.pdf},
+}
+```
